@@ -2,7 +2,7 @@
 
 This repository is a **TypeScript monorepo scaffold** for an engineering design assistant platform.
 
-> Current scope: repository structure, package boundaries, shared schemas, deterministic calculations, and a basic API layer.
+> Current scope: repository structure, package boundaries, shared schemas, deterministic calculations, a basic API layer, and a basic manual-entry web UI.
 >
 > Explicitly out of scope for this iteration:
 > - AI model/provider integration
@@ -54,3 +54,18 @@ npm run start --workspace @ommatidia/api
 
 - The API currently uses an in-memory repository/service layer and does not persist across restarts.
 - The in-memory data layer is intentionally temporary and is planned to be replaced by PostgreSQL later.
+
+
+## Web app commands
+
+Run from repository root:
+
+```bash
+npm run build --workspace @ommatidia/web
+npm run test --workspace @ommatidia/web
+npm run start --workspace @ommatidia/web
+```
+
+Notes:
+- The web UI currently supports **manual entry only** for projects, components, and engineering values.
+- AI extraction and document upload will be added in later tasks.
