@@ -16,5 +16,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "echo 'No lint rules configured for @ommatidia/shared yet.'",
     "test": "npm run build && node --test test/shared.test.mjs"
+  },
+  "dependencies": {
+    "zod": "0.0.1"
   }
 }
