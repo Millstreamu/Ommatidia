@@ -25,3 +25,10 @@
 - AI service abstraction and model routing
 - AuthN/AuthZ boundaries
 - Deployment topology
+
+
+## Web UI
+- `apps/web` provides a basic browser UI for project listing/creation, project details, component creation, engineering value manual entry, and value approval/rejection flows.
+- The web client calls API endpoints in `apps/api` through a small reusable API client module; deterministic calculations are executed through the API, not directly in the UI.
+- A basic Hydraulic Power module form is included and posts inputs (`flowLpm`, `pressureBar`, `efficiency`) to the hydraulic calculation endpoint.
+- This initial UI intentionally supports manual entry only; AI extraction workflows will be added later.
