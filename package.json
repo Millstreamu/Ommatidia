@@ -1,0 +1,16 @@
+{
+  "name": "engineering-design-assistant-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Monorepo scaffold for an engineering design assistant",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  }
+}

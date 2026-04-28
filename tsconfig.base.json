@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "composite": true,
+    "noEmitOnError": true,
+    "baseUrl": ".",
+    "paths": {
+      "@ommatidia/shared": ["packages/shared/src/index.ts"],
+      "@ommatidia/calculations": ["packages/calculations/src/index.ts"],
+      "@ommatidia/extraction": ["packages/extraction/src/index.ts"],
+      "@ommatidia/reports": ["packages/reports/src/index.ts"]
+    }
+  }
+}
