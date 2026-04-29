@@ -55,7 +55,7 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
           <select name="documentType"><option value="datasheet">datasheet</option><option value="manual">manual</option><option value="quote">quote</option><option value="schematic">schematic</option><option value="drawing">drawing</option><option value="other">other</option></select>
           <button>Upload document</button>
         </form>
-        <ul>${renderDocumentList(documents, apiBaseUrl)}</ul>
+        <ul>${documents.map((d)=>`<li>${d.originalFilename} | ${d.documentType} | ${d.fileSizeBytes} bytes | ${d.uploadStatus}/${d.processingStatus} | ${new Date(d.createdAt).toISOString()} | <a href="${apiBaseUrl}/documents/${d.id}/file" target="_blank" rel="noreferrer">View</a> <button data-extract-doc-id="${d.id}">Extract values</button> <span id="extract-status-${d.id}"></span></li>`).join('')}</ul>
 
         <h3>Hydraulic Power</h3>
         <form id="calc-form"><input name="flowLpm" placeholder="flowLpm" required/><input name="pressureBar" placeholder="pressureBar" required/><input name="efficiency" placeholder="efficiency" required/><button>Run</button></form>
@@ -79,6 +79,20 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
         await client.createEngineeringValue({ projectId, componentId: raw.componentId, key: raw.key, label: raw.label, value: parsedValue, valueType: raw.valueType, unit: raw.unit || undefined, status: raw.status || 'user_entered' });
         await load();
       };
+
+      view.querySelectorAll<HTMLButtonElement>('button[data-extract-doc-id]').forEach((btn) => {
+        btn.onclick = async () => {
+          const statusEl = view.querySelector(`#extract-status-${btn.dataset.extractDocId!}`) as HTMLElement;
+          statusEl.textContent = 'Extracting...';
+          try {
+            const result = await client.extractValues({ projectId, documentId: btn.dataset.extractDocId! });
+            statusEl.textContent = `Extracted ${result.candidateValues.length} candidate value(s)`;
+            await load();
+          } catch (error) {
+            statusEl.textContent = error instanceof Error ? error.message : 'Extraction failed';
+          }
+        };
+      });
 
       view.querySelectorAll<HTMLButtonElement>('button[data-status-id]').forEach((btn) => {
         btn.onclick = async () => { await client.updateEngineeringValueStatus(btn.dataset.statusId!, btn.dataset.status as 'approved' | 'rejected'); await load(); };

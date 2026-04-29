@@ -14,3 +14,11 @@
 - Prompt/version trace logging
 - Confidence thresholds and escalation paths
 - Safe-failure behavior
+
+## Extraction safety rules (Task 07)
+
+- Extraction must return structured JSON that validates shared schemas.
+- Candidate values must keep source references when available and must not fabricate evidence.
+- Missing evidence must produce warnings and `missingInformation` entries instead of guesses.
+- AI extraction must never mark values as `approved` and must never perform final engineering calculations.
+- User-entered/approved values remain authoritative; extraction must not overwrite approved values.

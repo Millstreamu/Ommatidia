@@ -6,3 +6,7 @@ dist
 
 storage/uploads/
 
+
+.env.local
+.env.*.local
+*.secret
