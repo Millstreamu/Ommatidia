@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, resolveApiBaseUrl, submitCreateProject } from '../dist/app.js';
+import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, resolveApiBaseUrl, submitCreateProject } from '../dist/app.js';
 import { startWebApp } from '../dist/index.js';
 import { createServer } from 'node:http';
 import { ApiClient } from '../dist/apiClient.js';
@@ -45,6 +45,26 @@ test('engineering value status badges include key statuses', () => {
   assert.match(renderStatusBadge('needs_review'), /needs_review/);
   assert.match(renderStatusBadge('ai_extracted'), /ai_extracted/);
   assert.match(renderStatusBadge('approved'), /approved/);
+});
+
+test('OpenAI status badge renders connected state', () => {
+  const html = renderOpenAiStatusBadge({ ok: true, extractionProvider: 'openai', openAiConfigured: true, apiProxyMode: true, timestamp: new Date().toISOString() });
+  assert.match(html, /OpenAI: connected/);
+});
+
+test('OpenAI status badge renders missing key state', () => {
+  const html = renderOpenAiStatusBadge({ ok: true, extractionProvider: 'openai', openAiConfigured: false, apiProxyMode: true, timestamp: new Date().toISOString() });
+  assert.match(html, /OpenAI: key missing/);
+});
+
+test('OpenAI status badge renders mock mode state', () => {
+  const html = renderOpenAiStatusBadge({ ok: true, extractionProvider: 'mock', openAiConfigured: false, apiProxyMode: true, timestamp: new Date().toISOString() });
+  assert.match(html, /Extraction: mock mode/);
+});
+
+test('OpenAI status badge renders unavailable state', () => {
+  const html = renderOpenAiStatusBadge(undefined, true);
+  assert.match(html, /Status unavailable/);
 });
 
 test('document list renders uploaded metadata', () => {

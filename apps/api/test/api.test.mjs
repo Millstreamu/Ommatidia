@@ -123,3 +123,58 @@ test('unknown route includes CORS headers', async () => { await withServer(async
   assert.equal(res.status, 404);
   assert.equal(res.headers.get('access-control-allow-origin'), 'http://127.0.0.1:3000');
 }); });
+
+test('system status returns openAiConfigured false when OPENAI_API_KEY missing', async () => {
+  const prevProvider = process.env.EXTRACTION_PROVIDER;
+  const prevKey = process.env.OPENAI_API_KEY;
+  process.env.EXTRACTION_PROVIDER = 'openai';
+  delete process.env.OPENAI_API_KEY;
+  try {
+    await withServer(async (base) => {
+      const res = await fetch(`${base}/system/status`);
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.extractionProvider, 'openai');
+      assert.equal(body.openAiConfigured, false);
+    });
+  } finally {
+    process.env.EXTRACTION_PROVIDER = prevProvider;
+    if (prevKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = prevKey;
+  }
+});
+
+test('system status returns openAiConfigured true when OPENAI_API_KEY set', async () => {
+  const prevProvider = process.env.EXTRACTION_PROVIDER;
+  const prevKey = process.env.OPENAI_API_KEY;
+  process.env.EXTRACTION_PROVIDER = 'openai';
+  process.env.OPENAI_API_KEY = 'unit-test-key';
+  try {
+    await withServer(async (base) => {
+      const res = await fetch(`${base}/system/status`);
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.openAiConfigured, true);
+    });
+  } finally {
+    process.env.EXTRACTION_PROVIDER = prevProvider;
+    if (prevKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = prevKey;
+  }
+});
+
+test('system status never includes OPENAI_API_KEY values', async () => {
+  const prevProvider = process.env.EXTRACTION_PROVIDER;
+  const prevKey = process.env.OPENAI_API_KEY;
+  process.env.EXTRACTION_PROVIDER = 'openai';
+  process.env.OPENAI_API_KEY = 'super-secret-value';
+  try {
+    await withServer(async (base) => {
+      const res = await fetch(`${base}/system/status`);
+      const raw = await res.text();
+      assert.doesNotMatch(raw, /super-secret-value/);
+      assert.doesNotMatch(raw, /OPENAI_API_KEY/);
+    });
+  } finally {
+    process.env.EXTRACTION_PROVIDER = prevProvider;
+    if (prevKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = prevKey;
+  }
+});

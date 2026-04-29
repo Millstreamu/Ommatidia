@@ -52,6 +52,7 @@ Notes:
 - The default extraction provider is `mock`, so real OpenAI credentials are not required for basic local startup.
 - If the web UI appears blank, open the browser developer console and check for JavaScript errors.
 - In GitHub Codespaces, opening forwarded port `3000` is enough for normal app use because browser API calls go to same-origin `/api` and are proxied by the web server to the internal API process on port `3001`.
+- Header status badge shows OpenAI/extraction mode from backend `/api/system/status`; it only checks server configuration and does not display or validate the actual API key.
 
 
 ### Troubleshooting web/API connection in Codespaces
