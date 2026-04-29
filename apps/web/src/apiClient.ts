@@ -5,6 +5,7 @@ export interface Component { id: string; projectId: string; name: string; type: 
 export interface EngineeringValue { id: string; projectId: string; componentId?: string; key: string; label: string; value: number | string | boolean; valueType: string; unit?: string; status: string; createdAt: string; updatedAt: string; }
 export interface EngineeringModule { id: string; name: string; description: string; moduleType: string; }
 export interface DocumentRecord { id: string; projectId: string; originalFilename: string; storedFilename: string; mimeType: string; fileSizeBytes: number; documentType: string; uploadStatus: string; processingStatus: string; createdAt: string; updatedAt: string; }
+export interface SystemStatus { ok: boolean; extractionProvider: 'openai' | 'mock' | 'unknown'; openAiConfigured: boolean; apiProxyMode: boolean; timestamp: string; }
 
 export interface HydraulicPowerResponse { moduleId: string; projectId: string; inputsUsed: Array<{ key: string; label: string; value: number | string | boolean; valueType: string; unit?: string }>; outputs: Array<{ key: string; label: string; value: number | string | boolean; valueType: string; unit?: string }>; warnings: string[]; assumptions: string[]; createdAt: string; }
 
@@ -21,6 +22,7 @@ export class ApiClient {
   constructor(private readonly baseUrl: string) {}
   private async request<T>(path: string, init?: RequestInit): Promise<T> { let response: Response; try { response = await fetch(`${this.baseUrl}${path}`, { ...init, headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) } }); } catch (error) { throw toHelpfulNetworkError(error); } if (!response.ok) { let body: any = undefined; try { body = await response.json(); } catch {} const err = new Error(body?.message ?? `API request failed (${response.status})`) as Error & { extractionError?: ExtractionErrorResponse }; if (body?.errorCode) err.extractionError = body as ExtractionErrorResponse; throw err; } return response.json() as Promise<T>; }
   listProjects() { return this.request<Project[]>('/projects'); }
+  getSystemStatus() { return this.request<SystemStatus>('/system/status'); }
   createProject(input: { name: string; description?: string; projectType: string }) { return this.request<Project>('/projects', { method: 'POST', body: JSON.stringify(input) }); }
   getProject(projectId: string) { return this.request<Project>(`/projects/${projectId}`); }
   listComponents(projectId: string) { return this.request<Component[]>(`/components?projectId=${projectId}`); }

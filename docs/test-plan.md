@@ -88,6 +88,7 @@ This test plan defines acceptance criteria and validation strategy for existing 
 - [ ] Projects page shows API base URL debug line as `/api` in development/Codespaces.
 - [ ] Project details are grouped into workflow sections (overview, components, values, documents, extraction, calculations, report, export).
 - [ ] Engineering value statuses are visually explicit, with clear approve/reject actions.
+- [ ] Header status badge shows OpenAI connected/key missing, mock mode, or unavailable state based on `/api/system/status`.
 - [ ] Document extraction surfaces loading/success/friendly error/retry cues.
 - [ ] Project create failure resets busy state and re-enables create button.
 - [ ] Hydraulic calculation UI labels expected units and presents readable results.
@@ -124,6 +125,7 @@ This test plan defines acceptance criteria and validation strategy for existing 
 | Projects empty/list rendering states | Covered by UI test |
 | Project details workflow section headings | Covered by UI test |
 | Engineering status badge rendering | Covered by UI test |
+| System status badge states (openai connected/missing, mock, unavailable) | Covered by API + UI tests |
 | Calculation result readability labels | Covered by UI test |
 | Report edit/save representation + export trigger helper | Covered by UI test |
 | Uploaded files not committed to Git | Manual only (repo hygiene check) |

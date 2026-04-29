@@ -1,4 +1,4 @@
-import { ApiClient } from './apiClient.js';
+import { ApiClient, type SystemStatus } from './apiClient.js';
 
 
 export function resolveApiBaseUrl(_hostname: string): string {
@@ -17,6 +17,14 @@ const STATUS_COLORS: Record<string, string> = {
 export function validateEngineeringValueForm(input: Record<string, string>): string[] {
   const required = ['key', 'label', 'value', 'valueType'];
   return required.filter((field) => !input[field]?.trim()).map((field) => `${field} is required`);
+}
+
+export function renderOpenAiStatusBadge(status?: SystemStatus, unavailable = false): string {
+  const tooltip = 'This only checks server configuration. It does not display or test the key.';
+  if (unavailable || !status) return `<span title="${tooltip}" style="display:inline-block;padding:4px 10px;border-radius:999px;background:#fee2e2;color:#991b1b;font-size:12px;font-weight:600;">Status unavailable</span>`;
+  if (status.extractionProvider === 'mock') return `<span title="${tooltip}" style="display:inline-block;padding:4px 10px;border-radius:999px;background:#e2e8f0;color:#334155;font-size:12px;font-weight:600;">Extraction: mock mode</span>`;
+  if (status.extractionProvider === 'openai' && status.openAiConfigured) return `<span title="${tooltip}" style="display:inline-block;padding:4px 10px;border-radius:999px;background:#dcfce7;color:#166534;font-size:12px;font-weight:600;">OpenAI: connected</span>`;
+  return `<span title="${tooltip}" style="display:inline-block;padding:4px 10px;border-radius:999px;background:#fee2e2;color:#991b1b;font-size:12px;font-weight:600;">OpenAI: key missing</span>`;
 }
 
 export function renderStatusBadge(status: string): string {
@@ -71,9 +79,18 @@ export async function triggerReportSectionsDocxExport(client: ApiClient, input: 
 
 export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
   const client = new ApiClient(apiBaseUrl);
-  root.innerHTML = `<header style="padding:16px;border-bottom:1px solid #cbd5e1;background:#f8fafc;"><h1 style="margin:0;">Engineering Design Assistant</h1><p style="margin:6px 0 0;color:#334155;">AI-assisted engineering drafts with deterministic calculations and review-first workflows.</p><nav id="top-nav" style="margin-top:10px;"></nav></header><main id="view" style="padding:16px;max-width:1100px;margin:auto;"></main>`;
+  root.innerHTML = `<header style="padding:16px;border-bottom:1px solid #cbd5e1;background:#f8fafc;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;"><div><h1 style="margin:0;">Engineering Design Assistant</h1><p style="margin:6px 0 0;color:#334155;">AI-assisted engineering drafts with deterministic calculations and review-first workflows.</p><nav id="top-nav" style="margin-top:10px;"></nav></div><div id="system-status"></div></header><main id="view" style="padding:16px;max-width:1100px;margin:auto;"></main>`;
   const view = root.querySelector('#view') as HTMLElement;
   const nav = root.querySelector('#top-nav') as HTMLElement;
+  const statusContainer = root.querySelector('#system-status') as HTMLElement;
+  const refreshSystemStatus = async () => {
+    try {
+      statusContainer.innerHTML = renderOpenAiStatusBadge(await client.getSystemStatus());
+    } catch (error) {
+      console.warn('System status check failed', { message: (error as Error).message });
+      statusContainer.innerHTML = renderOpenAiStatusBadge(undefined, true);
+    }
+  };
 
   const load = async () => {
     const hash = window.location.hash;
@@ -140,6 +157,7 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
   };
 
   window.addEventListener('hashchange', () => { void load(); });
+  void refreshSystemStatus();
   void load();
 }
 
