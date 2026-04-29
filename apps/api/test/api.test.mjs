@@ -161,6 +161,44 @@ test('system status returns openAiConfigured true when OPENAI_API_KEY set', asyn
   }
 });
 
+test('system status defaults provider to mock when EXTRACTION_PROVIDER unset', async () => {
+  const prevProvider = process.env.EXTRACTION_PROVIDER;
+  delete process.env.EXTRACTION_PROVIDER;
+  try {
+    await withServer(async (base) => {
+      const res = await fetch(`${base}/system/status`);
+      const body = await res.json();
+      assert.equal(body.extractionProvider, 'mock');
+    });
+  } finally {
+    if (prevProvider === undefined) delete process.env.EXTRACTION_PROVIDER; else process.env.EXTRACTION_PROVIDER = prevProvider;
+  }
+});
+
+test('PATCH /system/extraction-provider validates OpenAI key and switches provider', async () => {
+  const prevKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+  try {
+    await withServer(async (base) => {
+      const rejected = await fetch(`${base}/system/extraction-provider`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ extractionProvider: 'openai' }) });
+      assert.equal(rejected.status, 400);
+      const rejectedBody = await rejected.json();
+      assert.equal(rejectedBody.message, 'OpenAI API key is not configured on the server.');
+      process.env.OPENAI_API_KEY = 'unit-test-key';
+      const switched = await fetch(`${base}/system/extraction-provider`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ extractionProvider: 'openai' }) });
+      assert.equal(switched.status, 200);
+      const switchedBody = await switched.json();
+      assert.equal(switchedBody.extractionProvider, 'openai');
+      const back = await fetch(`${base}/system/extraction-provider`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ extractionProvider: 'mock' }) });
+      assert.equal(back.status, 200);
+      const backBody = await back.json();
+      assert.equal(backBody.extractionProvider, 'mock');
+    });
+  } finally {
+    if (prevKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = prevKey;
+  }
+});
+
 test('system status never includes OPENAI_API_KEY values', async () => {
   const prevProvider = process.env.EXTRACTION_PROVIDER;
   const prevKey = process.env.OPENAI_API_KEY;
@@ -175,6 +213,26 @@ test('system status never includes OPENAI_API_KEY values', async () => {
     });
   } finally {
     process.env.EXTRACTION_PROVIDER = prevProvider;
+    if (prevKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = prevKey;
+  }
+});
+
+test('extraction uses selected runtime provider for attempts', async () => {
+  const prevKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = 'unit-test-key';
+  try {
+    await withServer(async (base) => {
+      const project = await createProject(base);
+      const doc = await uploadDoc(base, project.id);
+      await fetch(`${base}/system/extraction-provider`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ extractionProvider: 'mock' }) });
+      await fetch(`${base}/extractions`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ projectId: project.id, documentId: doc.id }) });
+      await fetch(`${base}/system/extraction-provider`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ extractionProvider: 'openai' }) });
+      await fetch(`${base}/extractions`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ projectId: project.id, documentId: doc.id }) });
+      const attempts = await (await fetch(`${base}/extractions/attempts?projectId=${project.id}&documentId=${doc.id}`)).json();
+      assert.equal(attempts[0].provider, 'mock');
+      assert.equal(attempts[1].provider, 'openai');
+    });
+  } finally {
     if (prevKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = prevKey;
   }
 });

@@ -26,6 +26,25 @@ export function renderOpenAiStatusBadge(status?: SystemStatus, unavailable = fal
   if (status.extractionProvider === 'openai' && status.openAiConfigured) return `<span title="${tooltip}" style="display:inline-block;padding:4px 10px;border-radius:999px;background:#dcfce7;color:#166534;font-size:12px;font-weight:600;">OpenAI: connected</span>`;
   return `<span title="${tooltip}" style="display:inline-block;padding:4px 10px;border-radius:999px;background:#fee2e2;color:#991b1b;font-size:12px;font-weight:600;">OpenAI: key missing</span>`;
 }
+export function renderExtractionProviderControls(status?: SystemStatus): string {
+  if (!status) return '';
+  const modeLabel = status.extractionProvider === 'openai' ? 'Extraction: OpenAI' : 'Extraction: mock';
+  const keyLabel = status.openAiConfigured ? 'OpenAI key configured' : 'OpenAI key missing';
+  const openAiDisabled = status.openAiConfigured ? '' : 'disabled';
+  const note = status.extractionProvider === 'openai' ? '<p style="margin:8px 0 0;color:#92400e;font-weight:600;">Real OpenAI extraction may use API credits.</p>' : '';
+  return `<div style="margin-top:8px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;">
+    <div style="font-size:13px;font-weight:600;">${modeLabel}</div>
+    <div style="font-size:12px;color:#334155;margin:4px 0 8px;">${keyLabel}</div>
+    <label>Provider:
+      <select id="extraction-provider-select">
+        <option value="mock" ${status.extractionProvider === 'mock' ? 'selected' : ''}>Mock</option>
+        <option value="openai" ${status.extractionProvider === 'openai' ? 'selected' : ''} ${openAiDisabled}>OpenAI</option>
+      </select>
+    </label>
+    <div id="extraction-provider-error" style="color:#b91c1c;font-size:12px;margin-top:6px;"></div>
+    ${note}
+  </div>`;
+}
 
 export function renderStatusBadge(status: string): string {
   const color = STATUS_COLORS[status] ?? '#334155';
@@ -83,9 +102,27 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
   const view = root.querySelector('#view') as HTMLElement;
   const nav = root.querySelector('#top-nav') as HTMLElement;
   const statusContainer = root.querySelector('#system-status') as HTMLElement;
+  let latestSystemStatus: SystemStatus | undefined;
   const refreshSystemStatus = async () => {
     try {
-      statusContainer.innerHTML = renderOpenAiStatusBadge(await client.getSystemStatus());
+      latestSystemStatus = await client.getSystemStatus();
+      statusContainer.innerHTML = `${renderOpenAiStatusBadge(latestSystemStatus)}${renderExtractionProviderControls(latestSystemStatus)}`;
+      const select = statusContainer.querySelector('#extraction-provider-select') as HTMLSelectElement | null;
+      const errorEl = statusContainer.querySelector('#extraction-provider-error') as HTMLElement | null;
+      if (select) {
+        select.onchange = async () => {
+          const previous = latestSystemStatus?.extractionProvider ?? 'mock';
+          const next = select.value as 'mock' | 'openai';
+          if (errorEl) errorEl.textContent = '';
+          try {
+            latestSystemStatus = await client.updateExtractionProvider(next);
+            await refreshSystemStatus();
+          } catch (error) {
+            select.value = previous;
+            if (errorEl) errorEl.textContent = `Could not switch provider: ${(error as Error).message}`;
+          }
+        };
+      }
     } catch (error) {
       console.warn('System status check failed', { message: (error as Error).message });
       statusContainer.innerHTML = renderOpenAiStatusBadge(undefined, true);

@@ -28,3 +28,6 @@
 - Invalid AI output (invalid JSON or schema-invalid values) must not be saved as engineering values.
 - AI extraction failures must be visible to users through explicit error states.
 - Failed extraction must not overwrite approved values.
+
+- OpenAI API keys must remain server-side environment variables only and must never be returned to browsers, logs, or client storage.
+- Runtime extraction provider switches must expose only safe status fields (provider + configured boolean), never secret material.

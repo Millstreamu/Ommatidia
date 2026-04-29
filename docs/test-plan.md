@@ -47,6 +47,12 @@ This test plan defines acceptance criteria and validation strategy for existing 
 - [ ] Missing files return clear errors.
 - [ ] Invalid AI responses are not saved.
 
+### Extraction provider switching
+- [ ] User can switch extraction provider between mock and OpenAI from header controls.
+- [ ] OpenAI selection is blocked when server key is missing.
+- [ ] Header warns that OpenAI extraction may use API credits.
+- [ ] Switching provider updates extraction status display immediately.
+
 ### Extraction error handling
 - [ ] Missing API key returns `missing_api_key` when OpenAI provider is selected.
 - [ ] Timeout returns `request_timeout`.
@@ -126,6 +132,8 @@ This test plan defines acceptance criteria and validation strategy for existing 
 | Project details workflow section headings | Covered by UI test |
 | Engineering status badge rendering | Covered by UI test |
 | System status badge states (openai connected/missing, mock, unavailable) | Covered by API + UI tests |
+| Extraction provider switch endpoint and runtime state updates | Covered by API tests |
+| Header provider switch rendering, key-missing disable, credit warning | Covered by UI tests |
 | Calculation result readability labels | Covered by UI test |
 | Report edit/save representation + export trigger helper | Covered by UI test |
 | Uploaded files not committed to Git | Manual only (repo hygiene check) |
