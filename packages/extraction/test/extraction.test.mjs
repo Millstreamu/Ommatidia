@@ -1,10 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { writeFile, unlink } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { MockExtractionService, OpenAiExtractionService, RetryingExtractionService, runOpenAiSmokeTest } from '../dist/index.js';
 
 const doc = { id:'d',projectId:'p',originalFilename:'a.pdf',storedFilename:'a.pdf',mimeType:'application/pdf',fileSizeBytes:1,documentType:'datasheet',uploadStatus:'uploaded',processingStatus:'uploaded',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString() };
 
-const call = (svc) => svc.extractEngineeringValues({ projectId:'p',documentId:'d',document:doc,documentFilePath:'/tmp/a.pdf' });
+const call = (svc) => withTempPdf('Default engineering PDF text', (pdfPath) => svc.extractEngineeringValues({ projectId:'p',documentId:'d',document:doc,documentFilePath:pdfPath }));
+async function withTempPdf(content, fn) {
+  const filePath = path.join(os.tmpdir(), `extract-${Date.now()}-${Math.random()}.pdf`);
+  await writeFile(filePath, content);
+  try { return await fn(filePath); } finally { await unlink(filePath).catch(() => undefined); }
+}
 
 test('mock extraction returns deterministic valid candidate engineering values', async () => { const service = new MockExtractionService(); const result = await call(service); assert.equal(result.candidateValues[0].key, 'nominal_pressure'); });
 test('missing OPENAI_API_KEY returns missing_api_key', () => { const old = process.env.OPENAI_API_KEY; delete process.env.OPENAI_API_KEY; assert.throws(() => OpenAiExtractionService.fromEnv(), /OPENAI_API_KEY/); process.env.OPENAI_API_KEY = old; });
@@ -30,3 +38,49 @@ test('normalizes minimal candidate and saves inferred metadata', async () => { c
 test('normalizes string candidate without valueType to string', async () => { const svc = new OpenAiExtractionService({ responses: { create: async () => ({ output_text: '{"candidateValues":[{"key":"model","label":"Model","value":"ABC-123"}],"missingInformation":[],"warnings":[]}' }) } }); const result = await call(svc); assert.equal(result.candidateValues[0].valueType, 'string'); });
 
 test('invalid candidate without key label value is dropped with safe diagnostics', async () => { const svc = new OpenAiExtractionService({ responses: { create: async () => ({ output_text: '{"candidateValues":[{"valueType":"number"}],"missingInformation":[],"warnings":[]}' }) } }); const result = await call(svc); assert.equal(result.candidateValues.length, 0); assert.match(result.warnings.join(' | '), /Dropped 1 candidate: missing value field/); const dropped = result.diagnostics?.droppedCandidates ?? []; assert.equal(dropped.length, 1); assert.ok(!JSON.stringify(dropped).includes('Document server path')); });
+
+test('normalizes legacy sourceReference object into sourceReferences array', async () => {
+  await withTempPdf('Danfoss displacement 25 cc/rev pressure 260 bar', async (pdfPath) => {
+    const svc = new OpenAiExtractionService({ responses: { create: async () => ({ output_text: '{"candidateValues":[{"label":"Displacement","value":25,"unit":"cc/rev","sourceReference":{"sourceText":"Displacement 25 cc/rev"}}],"missingInformation":[],"warnings":[]}' }) } });
+    const result = await svc.extractEngineeringValues({ projectId: 'p', documentId: 'd', document: doc, documentFilePath: pdfPath });
+    assert.equal(result.candidateValues[0].sourceReferences.length, 1);
+    assert.equal(result.candidateValues[0].sourceReferences[0].documentId, 'd');
+  });
+});
+
+test('normalizes sourceReferences string and drops only invalid items', async () => {
+  await withTempPdf('Danfoss load sensing setting 20 bar', async (pdfPath) => {
+    const svc = new OpenAiExtractionService({ responses: { create: async () => ({ output_text: '{"candidateValues":[{"label":"Load sensing setting","value":20,"unit":"bar","sourceReferences":"Load sensing setting 20 bar"},{"label":"Rotation","value":"clockwise","sourceReferences":[{"sourceText":"Rotation clockwise"},42]}],"missingInformation":[],"warnings":[]}' }) } });
+    const result = await svc.extractEngineeringValues({ projectId: 'p', documentId: 'd', document: doc, documentFilePath: pdfPath });
+    assert.equal(result.candidateValues.length, 2);
+    assert.equal(result.candidateValues[0].sourceReferences[0].sourceText, 'Load sensing setting 20 bar');
+    assert.equal(result.candidateValues[1].sourceReferences.length, 1);
+  });
+});
+
+test('image-only/no-text pdf path returns OCR warning and no unrelated guesses', async () => {
+  await withTempPdf('%PDF-1.4\x00\x01\x02\x03', async (pdfPath) => {
+    const svc = new OpenAiExtractionService({ responses: { create: async () => { throw new Error('should not call model'); } } });
+    const result = await svc.extractEngineeringValues({ projectId: 'p', documentId: 'd', document: doc, documentFilePath: pdfPath });
+    assert.equal(result.candidateValues.length, 0);
+    assert.match(result.warnings.join(' | '), /No selectable text was found\. OCR or vision extraction is required for this document\./i);
+  });
+});
+
+test('extraction request uses selected document content only (no stale text)', async () => {
+  const seenPrompts = [];
+  const svc = new OpenAiExtractionService({ responses: { create: async (payload) => {
+    const textBlock = payload.input[0].content[1].text;
+    seenPrompts.push(textBlock);
+    return { output_text: '{"candidateValues":[],"missingInformation":[],"warnings":[]}' };
+  } } });
+  await withTempPdf('Danfoss displacement 25 cc/rev', async (pdfPathA) => {
+    await svc.extractEngineeringValues({ projectId: 'p', documentId: 'd-a', document: { ...doc, id: 'd-a', originalFilename: 'A.pdf' }, documentFilePath: pdfPathA });
+  });
+  await withTempPdf('CAT 3054C max power 63 kW', async (pdfPathB) => {
+    await svc.extractEngineeringValues({ projectId: 'p', documentId: 'd-b', document: { ...doc, id: 'd-b', originalFilename: 'B.pdf' }, documentFilePath: pdfPathB });
+  });
+  assert.match(seenPrompts[0], /Danfoss displacement 25 cc\/rev/);
+  assert.doesNotMatch(seenPrompts[1], /Danfoss displacement 25 cc\/rev/);
+  assert.match(seenPrompts[1], /CAT 3054C max power 63 kW/);
+});
