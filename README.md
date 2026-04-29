@@ -197,7 +197,10 @@ EXTRACTION_PROVIDER=mock npm run start --workspace @ommatidia/api
 - Invalid reference entries are dropped item-by-item without dropping otherwise valid candidate values.
 - If references are missing entirely, `sourceReferences` defaults to `[]`.
 
-### Troubleshooting: Image-only PDF needs OCR/vision extraction
-- If a PDF has no selectable text, extraction returns:
-  - `No selectable text was found. OCR or vision extraction is required for this document.`
-- This avoids unrelated guessed values from non-document context.
+### Troubleshooting: PDF text extraction produced metadata/font information
+- If extraction diagnostics show low useful text and warnings about visible text quality, the parser likely encountered PDF internals (font/encoding/xref/stream metadata) instead of human-readable document text.
+- In this case extraction returns:
+  - `PDF text extraction did not produce useful visible text.`
+  - `OCR or vision extraction is required for this document.`
+- The API/UI diagnostics now expose extracted text character count and useful text character count to help confirm whether a text-readable PDF was parsed correctly.
+- This avoids sending bad PDF internals to OpenAI as evidence and avoids unrelated guessed values.

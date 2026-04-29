@@ -40,11 +40,11 @@ The API now supports local development uploads for PDF/image files to project-sc
 ## AI extraction pipeline
 
 The first extraction pipeline is synchronous and runs inside `apps/api`:
-1. Client calls `POST /extractions` with `projectId` and `documentId`.
-2. API loads document metadata and verifies the uploaded file exists.
-3. API invokes an `ExtractionService` (`mock` by default, `openai` when configured).
-4. Candidate `EngineeringValue` records are stored with `needs_review`/`ai_extracted` status only.
-5. Approved values are never overwritten by extraction writes.
+1. **Upload**: document bytes are stored in `storage/uploads` and linked by metadata.
+2. **Text extraction**: API resolves file path and extraction reads document text (PDF page text with diagnostics and internal-text detection).
+3. **OpenAI extraction**: only useful visible text is sent to OpenAI (`mock` by default, `openai` when configured).
+4. **Candidate normalization**: response candidates are normalized/validated into shared schema.
+5. **Review workflow**: saved values remain `needs_review`/`ai_extracted`; approved values are never overwritten.
 
 No background jobs, OCR pipeline, or report generation side effects are included in this phase.
 

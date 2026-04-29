@@ -10,7 +10,9 @@ export interface ExtractionErrorResponse { errorCode: ExtractionErrorCode; messa
 export class ExtractionError extends Error { constructor(public readonly payload: ExtractionErrorResponse) { super(payload.message); } }
 export interface ExtractEngineeringValuesInput { projectId: string; documentId: string; document: Document; documentFilePath: string; extractionTarget?: { componentType?: string; moduleType?: string }; }
 export interface DroppedCandidateDiagnostic { candidateIdentifier?: string; reasonCode: 'missing_value' | 'invalid_value_type' | 'invalid_source_references' | 'schema_validation_failed'; validationIssuePaths: string[]; validationIssueMessages: string[]; missingRequiredFields: boolean; }
-export interface ExtractionDiagnostics { documentFilename: string; documentMimeType: string; contentRead: boolean; contentSentToModel: boolean; rawCandidateCount: number; invalidCandidateCount: number; skippedApprovedConflictCount: number; droppedCandidates?: DroppedCandidateDiagnostic[]; }
+export interface ExtractionDiagnostics { documentFilename: string; documentMimeType: string; contentRead: boolean; contentSentToModel: boolean; rawCandidateCount: number; invalidCandidateCount: number; skippedApprovedConflictCount: number; droppedCandidates?: DroppedCandidateDiagnostic[]; pdfTextExtraction?: PdfExtractionDiagnostics; }
+export interface PdfExtractionDiagnostics { pageCount?: number; extractedCharacterCount: number; usefulTextCharacterCount: number; suspiciousInternalTextRatio: number; fallbackUsed: boolean; looksLikePdfInternals: boolean; }
+export interface PdfExtractionResult { pages: Array<{ pageNumber: number; text: string }>; combinedText: string; diagnostics: PdfExtractionDiagnostics; }
 export interface ExtractEngineeringValuesResult { candidateValues: EngineeringValue[]; missingInformation: string[]; warnings: string[]; providerMetadata?: { provider: 'mock' | 'openai'; model?: string }; diagnostics?: ExtractionDiagnostics; }
 export interface ExtractionService { extractEngineeringValues(input: ExtractEngineeringValuesInput): Promise<ExtractEngineeringValuesResult>; }
 export function normalizedExtractionError(errorCode: ExtractionErrorCode, message: string, retryable = false, options?: { userAction?: string; details?: Record<string, unknown> }): ExtractionErrorResponse { return { errorCode, message, retryable, userAction: options?.userAction, details: options?.details, timestamp: new Date().toISOString() }; }
@@ -134,11 +136,49 @@ function normalizeCandidate(raw: Record<string, unknown>, input: ExtractEngineer
   }
   return candidate;
 }
-function extractLikelyTextFromPdfContent(buffer: Uint8Array): string {
+function scoreInternalPdfText(text: string): number {
+  const internalHits = (text.match(/(?:\/Font|\/Encoding|\bobj\b|\bendobj\b|\bxref\b|\bstream\b|\bendstream\b|\btrailer\b|<\?xpacket|<rdf:RDF|\/BaseFont)/gi) ?? []).length;
+  const englishTokens = (text.match(/[A-Za-z]{3,}/g) ?? []).length;
+  const denominator = Math.max(1, englishTokens + internalHits);
+  return internalHits / denominator;
+}
+function decodePdfString(value: string): string {
+  return value.replace(/\\\)/g, ')').replace(/\\\(/g, '(').replace(/\\n/g, '\n').replace(/\\r/g, '\r').replace(/\\t/g, '\t').replace(/\\\\/g, '\\');
+}
+function extractPdfVisibleText(buffer: Uint8Array): PdfExtractionResult {
   const raw = Buffer.from(buffer).toString('latin1');
-  const matches = raw.match(/[A-Za-z0-9][A-Za-z0-9\s,.:;()/_+\-%]{8,}/g) ?? [];
-  const unique = Array.from(new Set(matches.map((line: string) => line.replace(/\s+/g, ' ').trim()).filter((line: string) => line.length > 10)));
-  return unique.slice(0, 2500).join('\n');
+  const pageParts = raw.split(/\/Type\s*\/Page\b/g).slice(1);
+  const pages: Array<{ pageNumber: number; text: string }> = [];
+  let fallbackUsed = false;
+  const parsePart = (content: string): string => {
+    const strings = content.match(/\((?:\\.|[^\\)])+\)\s*Tj/g) ?? [];
+    const arrayStrings = content.match(/\[(.*?)\]\s*TJ/gs) ?? [];
+    const lines: string[] = [];
+    for (const token of strings) lines.push(decodePdfString(token.replace(/\)\s*Tj$/, '').replace(/^\(/, '')));
+    for (const chunk of arrayStrings) {
+      const items = chunk.match(/\((?:\\.|[^\\)])+\)/g) ?? [];
+      for (const item of items) lines.push(decodePdfString(item.slice(1, -1)));
+    }
+    return lines.join(' ').replace(/\s+/g, ' ').trim();
+  };
+  for (let i = 0; i < pageParts.length; i += 1) {
+    const text = parsePart(pageParts[i]);
+    if (text) pages.push({ pageNumber: i + 1, text });
+  }
+  if (pages.length === 0) {
+    fallbackUsed = true;
+    const matches = raw.match(/[A-Za-z0-9][A-Za-z0-9\s,.:;()/_+\-%]{8,}/g) ?? [];
+    const unique = Array.from(new Set(matches.map((line: string) => line.replace(/\s+/g, ' ').trim()).filter((line: string) => line.length > 10)));
+    if (unique.length) pages.push({ pageNumber: 1, text: unique.slice(0, 2500).join('\n') });
+  }
+  const combinedText = pages.map((p) => `[Page ${p.pageNumber}]\n${p.text}`).join('\n\n');
+  const usefulText = combinedText
+    .replace(/(?:\/Font|\/Encoding|\bobj\b|\bendobj\b|\bxref\b|\bstream\b|\bendstream\b|\btrailer\b|<\?xpacket|<rdf:RDF|\/BaseFont)/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const suspiciousInternalTextRatio = scoreInternalPdfText(combinedText);
+  const looksLikePdfInternals = suspiciousInternalTextRatio > 0.25 || usefulText.length < 20;
+  return { pages, combinedText, diagnostics: { pageCount: pages.length || undefined, extractedCharacterCount: combinedText.length, usefulTextCharacterCount: usefulText.length, suspiciousInternalTextRatio, fallbackUsed, looksLikePdfInternals } };
 }
 function formatDroppedWarnings(dropped: DroppedCandidateDiagnostic[]): string[] {
   const grouped = new Map<string, number>();
@@ -202,15 +242,16 @@ export class OpenAiExtractionService implements ExtractionService {
     const filePath = (input.documentFilePath ?? '').trim();
     if (!filePath) throw new ExtractionError(normalizedExtractionError('no_document_content', 'No document content was sent to the model.', false, { details: { model: this.model, documentContentIncluded: false, usedFileInput: false } }));
     const fileBytes = await readFile(filePath);
-    const parsedText = input.document.mimeType === 'application/pdf' ? extractLikelyTextFromPdfContent(fileBytes) : '';
+    const pdfExtraction = input.document.mimeType === 'application/pdf' ? extractPdfVisibleText(fileBytes) : undefined;
+    const parsedText = pdfExtraction?.combinedText ?? '';
     const textWasParsed = parsedText.trim().length > 0;
-    if (!textWasParsed && input.document.mimeType === 'application/pdf') {
+    if (input.document.mimeType === 'application/pdf' && (!textWasParsed || pdfExtraction?.diagnostics.looksLikePdfInternals)) {
       return {
         candidateValues: [],
         missingInformation: [],
-        warnings: ['No selectable text was found. OCR or vision extraction is required for this document.'],
+        warnings: ['PDF text extraction did not produce useful visible text.', 'OCR or vision extraction is required for this document.'],
         providerMetadata: { provider: 'openai', model: this.model },
-        diagnostics: { documentFilename: input.document.originalFilename, documentMimeType: input.document.mimeType, contentRead: true, contentSentToModel: false, rawCandidateCount: 0, invalidCandidateCount: 0, skippedApprovedConflictCount: 0 }
+        diagnostics: { documentFilename: input.document.originalFilename, documentMimeType: input.document.mimeType, contentRead: true, contentSentToModel: false, rawCandidateCount: 0, invalidCandidateCount: 0, skippedApprovedConflictCount: 0, ...(pdfExtraction?.diagnostics ? { pdfTextExtraction: pdfExtraction.diagnostics } : {}) } as ExtractionDiagnostics
       };
     }
     const prompt = `Extract engineering candidate values from this document only.
@@ -228,7 +269,7 @@ Rules:
 - Use status only as needs_review or ai_extracted if provided.`;
     let parsed: { candidateValues: Array<Record<string, unknown>>; missingInformation: string[]; warnings: string[] };
     try {
-      const response = await this.client.responses.create({ model: this.model, input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }, { type: 'input_text', text: `Document text content follows:\n${parsedText}` }] }], text: { format: { type: 'json_object' } } });
+      const response = await this.client.responses.create({ model: this.model, input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }, { type: 'input_text', text: `Document text content follows (extract only visible values from this text):\n${parsedText}` }] }], text: { format: { type: 'json_object' } } });
       const responseText = this.getResponseText(response);
       if (!responseText) {
         throw new ExtractionError(normalizedExtractionError('invalid_model_response', 'Model returned empty output.', false, { userAction: 'Retry extraction or adjust prompt/model configuration.', details: this.buildSafeDiagnostics(response, true, false) }));
@@ -251,7 +292,7 @@ Rules:
     const warnings = [...parsed.warnings];
     if (candidateValues.length === 0) warnings.push('No engineering values were extracted from this document.');
     if (invalidCandidateCount > 0) warnings.push(...formatDroppedWarnings(droppedCandidates));
-    return { candidateValues, missingInformation: parsed.missingInformation, warnings, providerMetadata: { provider: 'openai', model: this.model }, diagnostics: { documentFilename: input.document.originalFilename, documentMimeType: input.document.mimeType, contentRead: true, contentSentToModel: true, rawCandidateCount: parsed.candidateValues.length, invalidCandidateCount, skippedApprovedConflictCount: 0, droppedCandidates } };
+    return { candidateValues, missingInformation: parsed.missingInformation, warnings, providerMetadata: { provider: 'openai', model: this.model }, diagnostics: { documentFilename: input.document.originalFilename, documentMimeType: input.document.mimeType, contentRead: true, contentSentToModel: true, rawCandidateCount: parsed.candidateValues.length, invalidCandidateCount, skippedApprovedConflictCount: 0, droppedCandidates, ...(pdfExtraction?.diagnostics ? { pdfTextExtraction: pdfExtraction.diagnostics } : {}) } as ExtractionDiagnostics };
   }
 }
 
