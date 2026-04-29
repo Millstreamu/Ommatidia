@@ -103,3 +103,23 @@ test('unknown API route returns not found', async () => { await withServer(async
   const body = await res.json();
   assert.equal(body.error, 'Not found');
 }); });
+
+
+test('OPTIONS includes CORS headers and returns 204', async () => { await withServer(async (base) => {
+  const res = await fetch(`${base}/projects`, { method: 'OPTIONS', headers: { origin: 'https://friendly-space-abc123-3000.app.github.dev' } });
+  assert.equal(res.status, 204);
+  assert.equal(res.headers.get('access-control-allow-methods'), 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  assert.match(res.headers.get('access-control-allow-headers') ?? '', /content-type/i);
+}); });
+
+test('GET /projects includes CORS headers for allowed dev origin', async () => { await withServer(async (base) => {
+  const res = await fetch(`${base}/projects`, { headers: { origin: 'http://localhost:3000' } });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('access-control-allow-origin'), 'http://localhost:3000');
+}); });
+
+test('unknown route includes CORS headers', async () => { await withServer(async (base) => {
+  const res = await fetch(`${base}/missing`, { headers: { origin: 'http://127.0.0.1:3000' } });
+  assert.equal(res.status, 404);
+  assert.equal(res.headers.get('access-control-allow-origin'), 'http://127.0.0.1:3000');
+}); });

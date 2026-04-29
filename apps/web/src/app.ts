@@ -39,6 +39,25 @@ export function renderProjectsView(projects: Array<{ id: string; name: string; d
   if (!projects.length) return '<p>No projects yet. Create your first project to get started.</p>';
   return `<ul style="list-style:none;padding:0;display:grid;gap:12px;">${projects.map((p) => `<li style="border:1px solid #cbd5e1;border-radius:8px;padding:12px;"><h3 style="margin:0 0 6px;">${p.name}</h3><p style="margin:0 0 6px;">${p.description ?? 'No description provided.'}</p><small>Created ${new Date(p.createdAt).toLocaleString()}</small><br/><a href="#/projects/${p.id}">Open project</a></li>`).join('')}</ul>`;
 }
+export async function submitCreateProject(
+  client: ApiClient,
+  input: { name: string; description?: string; projectType: string },
+  setStatus: (value: string) => void,
+  setBusy: (value: boolean) => void,
+  onSuccess: () => Promise<void>
+): Promise<void> {
+  setBusy(true);
+  setStatus('Creating...');
+  try {
+    await client.createProject(input);
+    await onSuccess();
+    setStatus('Created.');
+  } catch (error) {
+    setStatus(`Could not create project: ${(error as Error).message}`);
+  } finally {
+    setBusy(false);
+  }
+}
 
 export async function triggerReportSectionsDocxExport(client: ApiClient, input: { projectId: string; reportSectionIds: string[]; documentTitle?: string; includeSourceReferences?: boolean }): Promise<string> {
   const blob = await client.exportReportSectionsDocx(input);
@@ -105,7 +124,7 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
 
     nav.innerHTML = '<strong>Projects</strong>';
     let projectsHtml = 'Loading projects…';
-    view.innerHTML = `<h2>Projects</h2><p>Create or open a project to start adding components, documents, calculations, and report sections.</p><div id="project-list">${projectsHtml}</div><h3>Create project</h3><form id="project-form"><input name="name" placeholder="Project name" required/><input name="description" placeholder="Description"/><input name="projectType" placeholder="Project type" value="custom" required/><button>Create project</button><span id="project-status"></span></form>`;
+    view.innerHTML = `<h2>Projects</h2><small style="color:#475569;display:block;margin-bottom:8px;">API base URL: ${apiBaseUrl}</small><p>Create or open a project to start adding components, documents, calculations, and report sections.</p><div id="project-list">${projectsHtml}</div><h3>Create project</h3><form id="project-form"><input name="name" placeholder="Project name" required/><input name="description" placeholder="Description"/><input name="projectType" placeholder="Project type" value="custom" required/><button>Create project</button><span id="project-status"></span></form>`;
     const listEl = view.querySelector('#project-list') as HTMLElement;
     try {
       listEl.innerHTML = renderProjectsView(await client.listProjects());
@@ -115,11 +134,11 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
     (view.querySelector('#project-form') as HTMLFormElement).onsubmit = async (e) => {
       e.preventDefault();
       const statusEl = view.querySelector('#project-status') as HTMLElement;
-      statusEl.textContent = 'Creating...';
+      const submitBtn = (e.currentTarget as HTMLFormElement).querySelector('button') as HTMLButtonElement;
       const fd = new FormData(e.currentTarget as HTMLFormElement);
-      await client.createProject({ name: String(fd.get('name')), description: String(fd.get('description') || ''), projectType: String(fd.get('projectType')) });
-      listEl.innerHTML = renderProjectsView(await client.listProjects());
-      statusEl.textContent = 'Created.';
+      await submitCreateProject(client, { name: String(fd.get('name')), description: String(fd.get('description') || ''), projectType: String(fd.get('projectType')) }, (v) => { statusEl.textContent = v; }, (busy) => { submitBtn.disabled = busy; }, async () => {
+        listEl.innerHTML = renderProjectsView(await client.listProjects());
+      });
     };
   };
 

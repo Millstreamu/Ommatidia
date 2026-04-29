@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, resolveApiBaseUrl } from '../dist/app.js';
+import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, resolveApiBaseUrl, submitCreateProject } from '../dist/app.js';
 import { startWebApp } from '../dist/index.js';
+import { ApiClient } from '../dist/apiClient.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -127,4 +128,22 @@ test('unknown javascript path returns 404', async () => {
     assert.equal(res.status, 404);
     assert.match(res.headers.get('content-type') ?? '', /text\/plain/);
   });
+});
+
+
+test('project create failure resets loading state and shows error', async () => {
+  const states = [];
+  const status = [];
+  const client = { createProject: async () => { throw new Error('Could not reach the API. Check that port 3001 is running and forwarded.'); } };
+  await submitCreateProject(client, { name: 'Demo', projectType: 'custom' }, (v) => status.push(v), (b) => states.push(b), async () => {});
+  assert.deepEqual(states, [true, false]);
+  assert.match(status.at(-1), /Could not create project:/);
+});
+
+test('API client converts network fetch failure into helpful message', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => { throw new TypeError('Failed to fetch'); };
+  const client = new ApiClient('http://127.0.0.1:3001');
+  await assert.rejects(() => client.listProjects(), /Could not reach the API\. Check that port 3001 is running and forwarded\./);
+  global.fetch = originalFetch;
 });

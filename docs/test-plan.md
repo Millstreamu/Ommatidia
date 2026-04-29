@@ -85,9 +85,11 @@ This test plan defines acceptance criteria and validation strategy for existing 
 ### UI usability and workflow clarity
 - [ ] Root web route (`/`) opens the main Projects UI without requiring a custom path.
 - [ ] Projects page shows empty/loading/error states with clear create/open affordances.
+- [ ] Projects page shows API base URL debug line in development/Codespaces.
 - [ ] Project details are grouped into workflow sections (overview, components, values, documents, extraction, calculations, report, export).
 - [ ] Engineering value statuses are visually explicit, with clear approve/reject actions.
 - [ ] Document extraction surfaces loading/success/friendly error/retry cues.
+- [ ] Project create failure resets busy state and re-enables create button.
 - [ ] Hydraulic calculation UI labels expected units and presents readable results.
 - [ ] Report section edit/save flow and Word export action/status remain clear and functional.
 
