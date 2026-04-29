@@ -71,6 +71,15 @@ This test plan defines acceptance criteria and validation strategy for existing 
 - [ ] Export rejects empty section selection.
 - [ ] Export rejects sections from another project.
 
+### Developer commands / local operations
+- [ ] One-command setup installs dependencies and prepares local environment.
+- [ ] Setup creates `.env` from `.env.example` only when `.env` is missing.
+- [ ] Setup prepares `storage/uploads` for local development uploads.
+- [ ] One command starts API + web together for development.
+- [ ] One command runs typecheck + tests.
+- [ ] Clean command removes build outputs without deleting `.env` or uploads.
+- [ ] Reset-local command (if used) clearly warns and only clears local dev upload data.
+
 ## Manual smoke test checklist
 1. Create project, component, and engineering values in the web app.
 2. Upload valid PDF and image files and verify document metadata appears.
@@ -121,6 +130,11 @@ This test plan defines acceptance criteria and validation strategy for existing 
 | DOCX export rejects missing projectId | Covered by API test |
 | DOCX export rejects empty section selection | Covered by API test |
 | DOCX export rejects foreign project sections | Covered by API test |
+| One-command setup + safe .env initialization | Covered by manual command verification |
+| One-command API+web start for local dev | Covered by manual command verification |
+| One-command typecheck+test (`check`) | Covered by manual command verification + existing CI-style commands |
+| Clean preserves .env and uploads | Covered by script behavior review + manual command verification |
+| Reset-local only clears local uploads and preserves .env | Covered by manual command verification |
 
 ## Known gaps
 - Project update/delete acceptance is defined but currently unsupported by API routes; leave as planned coverage until implemented.

@@ -8,6 +8,49 @@ This repository is a **TypeScript monorepo scaffold** for an engineering design 
 > - AI model/provider integration
 > - Authentication and authorization
 
+## Quick start (beginner-friendly)
+
+### With Make (recommended for Codespaces/Linux/macOS)
+
+```bash
+make setup
+make start
+```
+
+Useful follow-up commands:
+
+```bash
+make check
+make test
+make clean
+make reset-local
+```
+
+### If `make` is unavailable (npm-only)
+
+```bash
+npm run setup
+npm run start
+npm run check
+npm run test
+npm run clean
+npm run reset-local
+```
+
+### OPENAI_API_KEY check (without printing secret)
+
+```bash
+test -n "$OPENAI_API_KEY" && echo "OPENAI_API_KEY is set" || echo "OPENAI_API_KEY is missing"
+```
+
+Notes:
+- `setup` installs dependencies, creates `.env` from `.env.example` only when `.env` is missing, and prepares `storage/uploads/`.
+- `start` launches API and web together for local development.
+- Default local URLs: API `http://localhost:3001`, Web `http://localhost:3000`.
+- `reset-local` deletes local development uploads in `storage/uploads` and recreates the folder; it does not delete `.env`.
+- In GitHub Codespaces, `OPENAI_API_KEY` can be provided via Codespaces/repository secrets or environment variables.
+- The default extraction provider is `mock`, so real OpenAI credentials are not required for basic local startup.
+
 ## Repository layout
 
 - `apps/web` — future web frontend shell
