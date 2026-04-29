@@ -23,3 +23,7 @@ Build an engineering design assistant that helps engineers move from source arti
 2. Data model finalization.
 3. Calculation pipeline MVP.
 4. Reporting MVP.
+
+## Editable report sections
+
+Project detail pages include a Report Sections area where users can generate deterministic markdown sections (Component Summary, Calculation Summary, Assumptions and Warnings, Missing Information, Source References), edit title/body, and save draft content through the API.

@@ -23,12 +23,13 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
     const hash = window.location.hash;
     if (hash.startsWith('#/projects/')) {
       const projectId = hash.split('/')[2];
-      const [project, components, values, modules, documents] = await Promise.all([
+      const [project, components, values, modules, documents, reportSections] = await Promise.all([
         client.getProject(projectId),
         client.listComponents(projectId),
         client.listEngineeringValues(projectId),
         client.listModules(),
-        client.listDocuments(projectId)
+        client.listDocuments(projectId),
+        client.listReportSections(projectId)
       ]);
       const valuesByComponent = components.map((c) => ({ component: c, values: values.filter((v) => v.componentId === c.id) }));
       view.innerHTML = `
@@ -56,6 +57,21 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
           <button>Upload document</button>
         </form>
         <ul>${documents.map((d)=>`<li>${d.originalFilename} | ${d.documentType} | ${d.fileSizeBytes} bytes | ${d.uploadStatus}/${d.processingStatus} | ${new Date(d.createdAt).toISOString()} | <a href="${apiBaseUrl}/documents/${d.id}/file" target="_blank" rel="noreferrer">View</a> <button data-extract-doc-id="${d.id}">Extract values</button> <button data-retry-doc-id="${d.id}">Retry extraction</button> <span id="extract-status-${d.id}"></span><ul id="extract-attempts-${d.id}"></ul></li>`).join('')}</ul>
+
+
+        <h3>Report Sections (Editable Drafts)</h3>
+        <p>Generated sections are editable draft report content.</p>
+        <form id="report-generate-form">
+          <select name="sectionType">
+            <option value="component_summary">Component Summary</option>
+            <option value="calculation_summary">Calculation Summary</option>
+            <option value="assumptions_and_warnings">Assumptions and Warnings</option>
+            <option value="missing_information">Missing Information</option>
+            <option value="source_references">Source References</option>
+          </select>
+          <button>Generate section</button>
+        </form>
+        <div>${reportSections.map((section) => `<article><input data-report-title-id="${section.id}" value="${section.title}"/><textarea data-report-body-id="${section.id}" rows="8" cols="80">${section.bodyMarkdown}</textarea><button data-report-save-id="${section.id}">Save section</button></article>`).join('')}</div>
 
         <h3>Hydraulic Power</h3>
         <form id="calc-form"><input name="flowLpm" placeholder="flowLpm" required/><input name="pressureBar" placeholder="pressureBar" required/><input name="efficiency" placeholder="efficiency" required/><button>Run</button></form>
@@ -116,6 +132,23 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
         await client.uploadDocument(projectId, selectedFile, String(fd.get('documentType') || 'other'));
         await load();
       };
+
+      (view.querySelector('#report-generate-form') as HTMLFormElement).onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget as HTMLFormElement);
+        await client.generateReportSection({ projectId, sectionType: String(fd.get('sectionType')) as any, engineeringValues: values });
+        await load();
+      };
+
+      view.querySelectorAll<HTMLButtonElement>('button[data-report-save-id]').forEach((btn) => {
+        btn.onclick = async () => {
+          const id = btn.dataset.reportSaveId!;
+          const title = (view.querySelector(`input[data-report-title-id="${id}"]`) as HTMLInputElement).value;
+          const bodyMarkdown = (view.querySelector(`textarea[data-report-body-id="${id}"]`) as HTMLTextAreaElement).value;
+          await client.updateReportSection(id, { title, bodyMarkdown, status: 'needs_review' });
+          await load();
+        };
+      });
 
       (view.querySelector('#calc-form') as HTMLFormElement).onsubmit = async (e) => {
         e.preventDefault();

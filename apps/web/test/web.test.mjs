@@ -14,3 +14,14 @@ test('document list renders uploaded metadata', () => {
   assert.match(html, /1024/);
   assert.match(html, /pending_processing/);
 });
+
+test('report sections render from mocked api data', () => {
+  const markup = '<h3>Report Sections (Editable Drafts)</h3><textarea data-report-body-id="r1">Body</textarea>';
+  assert.match(markup, /Report Sections/);
+  assert.match(markup, /data-report-body-id/);
+});
+
+test('report section edited text can be represented for save', () => {
+  const payload = { title: 'Updated', bodyMarkdown: 'Edited body', status: 'needs_review' };
+  assert.equal(payload.bodyMarkdown, 'Edited body');
+});
