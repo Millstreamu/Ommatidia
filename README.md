@@ -53,6 +53,10 @@ Notes:
 - If the web UI appears blank, open the browser developer console and check for JavaScript errors.
 - In GitHub Codespaces, opening forwarded port `3000` is enough for normal app use because browser API calls go to same-origin `/api` and are proxied by the web server to the internal API process on port `3001`.
 - Header status badge shows OpenAI/extraction mode from backend `/api/system/status`; it only checks server configuration and does not display or validate the actual API key.
+- Header includes an extraction provider switch (Mock/OpenAI) that updates runtime server mode via `/api/system/extraction-provider` without restart.
+- Mock mode is safe for testing and does not call OpenAI.
+- OpenAI mode may use API credits when extraction is run.
+- API keys remain server-side only; the UI never stores or displays keys.
 
 
 ### Troubleshooting web/API connection in Codespaces

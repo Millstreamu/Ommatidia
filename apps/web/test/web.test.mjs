@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, resolveApiBaseUrl, submitCreateProject } from '../dist/app.js';
+import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, resolveApiBaseUrl, submitCreateProject } from '../dist/app.js';
 import { startWebApp } from '../dist/index.js';
 import { createServer } from 'node:http';
 import { ApiClient } from '../dist/apiClient.js';
@@ -60,6 +60,18 @@ test('OpenAI status badge renders missing key state', () => {
 test('OpenAI status badge renders mock mode state', () => {
   const html = renderOpenAiStatusBadge({ ok: true, extractionProvider: 'mock', openAiConfigured: false, apiProxyMode: true, timestamp: new Date().toISOString() });
   assert.match(html, /Extraction: mock mode/);
+});
+
+test('extraction provider controls render provider state and credit note', () => {
+  const html = renderExtractionProviderControls({ ok: true, extractionProvider: 'openai', openAiConfigured: true, apiProxyMode: true, timestamp: new Date().toISOString() });
+  assert.match(html, /Extraction: OpenAI/);
+  assert.match(html, /Real OpenAI extraction may use API credits\./);
+});
+
+test('extraction provider controls disable OpenAI when key missing', () => {
+  const html = renderExtractionProviderControls({ ok: true, extractionProvider: 'mock', openAiConfigured: false, apiProxyMode: true, timestamp: new Date().toISOString() });
+  assert.match(html, /OpenAI key missing/);
+  assert.match(html, /option value="openai"[^>]*disabled/);
 });
 
 test('OpenAI status badge renders unavailable state', () => {

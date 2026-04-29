@@ -23,6 +23,7 @@ export class ApiClient {
   private async request<T>(path: string, init?: RequestInit): Promise<T> { let response: Response; try { response = await fetch(`${this.baseUrl}${path}`, { ...init, headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) } }); } catch (error) { throw toHelpfulNetworkError(error); } if (!response.ok) { let body: any = undefined; try { body = await response.json(); } catch {} const err = new Error(body?.message ?? `API request failed (${response.status})`) as Error & { extractionError?: ExtractionErrorResponse }; if (body?.errorCode) err.extractionError = body as ExtractionErrorResponse; throw err; } return response.json() as Promise<T>; }
   listProjects() { return this.request<Project[]>('/projects'); }
   getSystemStatus() { return this.request<SystemStatus>('/system/status'); }
+  updateExtractionProvider(extractionProvider: 'mock' | 'openai') { return this.request<SystemStatus>('/system/extraction-provider', { method: 'PATCH', body: JSON.stringify({ extractionProvider }) }); }
   createProject(input: { name: string; description?: string; projectType: string }) { return this.request<Project>('/projects', { method: 'POST', body: JSON.stringify(input) }); }
   getProject(projectId: string) { return this.request<Project>(`/projects/${projectId}`); }
   listComponents(projectId: string) { return this.request<Component[]>(`/components?projectId=${projectId}`); }
