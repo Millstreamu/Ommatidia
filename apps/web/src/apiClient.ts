@@ -61,8 +61,8 @@ export class ApiClient {
 
 
 export interface ExtractionErrorResponse { errorCode: string; message: string; retryable: boolean; userAction?: string; details?: Record<string, unknown>; timestamp: string }
-export interface ExtractionResult { candidateValues: EngineeringValue[]; missingInformation: string[]; warnings: string[]; providerMetadata?: { provider: string; model?: string }; valuesCreatedCount?: number; diagnostics?: Record<string, unknown> }
-export interface ExtractionAttempt { id: string; projectId: string; documentId: string; provider: string; status: 'pending'|'succeeded'|'failed'; startedAt: string; completedAt?: string; errorCode?: string; safeErrorMessage?: string; valuesCreatedCount: number; warnings?: string[]; diagnostics?: Record<string, unknown> }
+export interface ExtractionResult { candidateValues: EngineeringValue[]; missingInformation: string[]; warnings: string[]; providerMetadata?: { provider: string; model?: string }; valuesCreatedCount?: number; createdCandidateKeys?: string[]; diagnostics?: Record<string, unknown> }
+export interface ExtractionAttempt { id: string; projectId: string; documentId: string; provider: string; status: 'pending'|'succeeded'|'failed'; startedAt: string; completedAt?: string; errorCode?: string; safeErrorMessage?: string; valuesCreatedCount: number; createdCandidateKeys?: string[]; warnings?: string[]; diagnostics?: Record<string, unknown> }
 export interface ReportSection { id: string; projectId: string; title: string; bodyMarkdown: string; sourceReferences: Array<{ documentId: string; pageNumber?: number; sectionTitle?: string; sourceText?: string }>; status: string; createdAt: string; updatedAt: string; }
 
 export interface LibraryEngineeringValue { key:string; label:string; value:number|string|boolean; valueType:string; unit?:string; status:string; notes?:string; sourceReferences:Array<{documentId:string; pageNumber?:number; sectionTitle?:string; sourceText?:string}> }

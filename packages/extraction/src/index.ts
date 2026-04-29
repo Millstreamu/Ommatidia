@@ -11,6 +11,7 @@ export class ExtractionError extends Error { constructor(public readonly payload
 export interface ExtractEngineeringValuesInput { projectId: string; documentId: string; document: Document; documentFilePath: string; extractionTarget?: { componentType?: string; moduleType?: string }; }
 export interface DroppedCandidateDiagnostic { candidateIdentifier?: string; reasonCode: 'missing_value' | 'invalid_value_type' | 'invalid_source_references' | 'schema_validation_failed'; validationIssuePaths: string[]; validationIssueMessages: string[]; missingRequiredFields: boolean; }
 export interface ExtractionDiagnostics { documentFilename: string; documentMimeType: string; contentRead: boolean; contentSentToModel: boolean; rawCandidateCount: number; invalidCandidateCount: number; skippedApprovedConflictCount: number; droppedCandidates?: DroppedCandidateDiagnostic[]; pdfTextExtraction?: PdfExtractionDiagnostics; pdfTextPreview?: string; }
+export interface OpenAiFallbackDiagnostics { attempted: boolean; called: boolean; mode: 'none'|'text'|'file_pdf'|'image'; fileInputUsed: boolean; model: string; rawCandidatesCount: number; savedCandidatesCount: number; warnings: string[]; }
 export interface PdfExtractionDiagnostics { pageCount?: number; extractedCharacterCount: number; usefulTextCharacterCount: number; suspiciousInternalTextRatio: number; fallbackUsed: boolean; looksLikePdfInternals: boolean; }
 export interface PdfExtractionResult { pages: Array<{ pageNumber: number; text: string }>; combinedText: string; diagnostics: PdfExtractionDiagnostics; }
 export interface ExtractEngineeringValuesResult { candidateValues: EngineeringValue[]; missingInformation: string[]; warnings: string[]; providerMetadata?: { provider: 'mock' | 'openai'; model?: string }; diagnostics?: ExtractionDiagnostics; }
@@ -257,14 +258,12 @@ export class OpenAiExtractionService implements ExtractionService {
     const textWasParsed = parsedText.trim().length > 0;
     const preview = sanitizePreview(parsedText);
     const deterministicCandidates: EngineeringValue[] = textWasParsed ? this.extractDeterministicCandidates(parsedText, input) : [];
-    if (input.document.mimeType === 'application/pdf' && (!textWasParsed || pdfExtraction?.diagnostics.looksLikePdfInternals || (pdfExtraction?.diagnostics.suspiciousInternalTextRatio ?? 0) >= 0.5)) {
-      return {
-        candidateValues: deterministicCandidates,
-        missingInformation: [],
-        warnings: ['PDF text extraction produced mostly internal PDF structure rather than visible text.', 'OCR/vision extraction or a better PDF parser is recommended.'],
-        providerMetadata: { provider: 'openai', model: this.model },
-        diagnostics: { documentFilename: input.document.originalFilename, documentMimeType: input.document.mimeType, contentRead: true, contentSentToModel: false, rawCandidateCount: deterministicCandidates.length, invalidCandidateCount: 0, skippedApprovedConflictCount: 0, pdfTextPreview: preview, ...(pdfExtraction?.diagnostics ? { pdfTextExtraction: pdfExtraction.diagnostics } : {}) } as ExtractionDiagnostics
-      };
+    const shouldUseVisionFallback = input.document.mimeType === 'application/pdf' && (!textWasParsed || pdfExtraction?.diagnostics.looksLikePdfInternals || (pdfExtraction?.diagnostics.suspiciousInternalTextRatio ?? 0) >= 0.5)
+      || ['image/png','image/jpeg','image/webp'].includes(input.document.mimeType);
+    if (shouldUseVisionFallback) {
+      const fallback = await this.extractUsingVisionFallback(input, fileBytes);
+      if (fallback) return fallback;
+      return { candidateValues: deterministicCandidates, missingInformation: [], warnings: ['PDF text extraction produced mostly internal PDF structure rather than visible text.', 'This PDF needs vision/OCR extraction, but no vision fallback is configured.'], providerMetadata: { provider: 'openai', model: this.model }, diagnostics: { documentFilename: input.document.originalFilename, documentMimeType: input.document.mimeType, contentRead: true, contentSentToModel: false, rawCandidateCount: deterministicCandidates.length, invalidCandidateCount: 0, skippedApprovedConflictCount: 0, pdfTextPreview: preview, openAiFallback: { attempted: true, called: false, mode: 'none', fileInputUsed: false, model: this.model, rawCandidatesCount: 0, savedCandidatesCount: deterministicCandidates.length, warnings: ['Vision fallback unavailable.'] }, ...(pdfExtraction?.diagnostics ? { pdfTextExtraction: pdfExtraction.diagnostics } : {}) } as ExtractionDiagnostics & { openAiFallback: OpenAiFallbackDiagnostics } };
     }
     const prompt = `Extract engineering candidate values from this document only.
 Document filename: ${input.document.originalFilename}
@@ -305,6 +304,27 @@ Rules:
     if (candidateValues.length === 0) warnings.push('No engineering values were extracted from this document.');
     if (invalidCandidateCount > 0) warnings.push(...formatDroppedWarnings(droppedCandidates));
     return { candidateValues, missingInformation: parsed.missingInformation, warnings, providerMetadata: { provider: 'openai', model: this.model }, diagnostics: { documentFilename: input.document.originalFilename, documentMimeType: input.document.mimeType, contentRead: true, contentSentToModel: true, rawCandidateCount: parsed.candidateValues.length + deterministicCandidates.length, invalidCandidateCount, skippedApprovedConflictCount: 0, droppedCandidates, pdfTextPreview: preview, ...(pdfExtraction?.diagnostics ? { pdfTextExtraction: pdfExtraction.diagnostics } : {}) } as ExtractionDiagnostics };
+  }
+  private async extractUsingVisionFallback(input: ExtractEngineeringValuesInput, fileBytes: Uint8Array): Promise<ExtractEngineeringValuesResult | undefined> {
+    const mime = input.document.mimeType;
+    const base64 = Buffer.from(fileBytes).toString('base64');
+    const isPdf = mime === 'application/pdf';
+    const dataUrl = `data:${mime};base64,${base64}`;
+    const prompt = `Inspect the visible document content and extract engineering candidate values only if explicitly visible.
+Return strict JSON with keys: candidateValues (array), missingInformation (array), warnings (array).
+Candidate fields: key, label, value, valueType, unit, confidence, notes, sourceReferences.
+Never infer from PDF internals; use only visible content.
+Focus on datasheet values such as manufacturer, product/model, model code, part number, component type, displacement, rated/max pressure, pressure compensator setting, load sensing setting, flow, rotation, ports, shaft/flange, power, torque, speed/rpm, dimensions, mass, temperature, mounting info.`;
+    try {
+      const response = await this.client.responses.create({ model: this.model, input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }, isPdf ? { type: 'input_file', filename: input.document.originalFilename, file_data: dataUrl } : { type: 'input_image', image_url: dataUrl }] }], text: { format: { type: 'json_object' } } });
+      const responseText = this.getResponseText(response);
+      if (!responseText) return undefined;
+      const parsed = JSON.parse(responseText) as { candidateValues: Array<Record<string, unknown>>; missingInformation: string[]; warnings: string[] };
+      if (!Array.isArray(parsed?.candidateValues) || !Array.isArray(parsed?.warnings) || !Array.isArray(parsed?.missingInformation)) return undefined;
+      const now = new Date().toISOString(); const candidateValues: EngineeringValue[] = []; let invalidCandidateCount = 0;
+      for (let index = 0; index < parsed.candidateValues.length; index += 1) { try { candidateValues.push(engineeringValueSchema.parse(normalizeCandidate(parsed.candidateValues[index], input, index, now))); } catch { invalidCandidateCount += 1; } }
+      return { candidateValues, missingInformation: parsed.missingInformation, warnings: parsed.warnings, providerMetadata: { provider: 'openai', model: this.model }, diagnostics: { documentFilename: input.document.originalFilename, documentMimeType: mime, contentRead: true, contentSentToModel: true, rawCandidateCount: parsed.candidateValues.length, invalidCandidateCount, skippedApprovedConflictCount: 0, openAiFallback: { attempted: true, called: true, mode: isPdf ? 'file_pdf' : 'image', fileInputUsed: true, model: this.model, rawCandidatesCount: parsed.candidateValues.length, savedCandidatesCount: candidateValues.length, warnings: parsed.warnings } } as ExtractionDiagnostics & { openAiFallback: OpenAiFallbackDiagnostics } };
+    } catch { return undefined; }
   }
 
   private extractDeterministicCandidates(text: string, input: ExtractEngineeringValuesInput): EngineeringValue[] {
