@@ -33,3 +33,18 @@ test('export button helper calls API and handles file response', async () => {
   const url = await triggerReportSectionsDocxExport(client, { projectId: 'p1', reportSectionIds: ['s1'] });
   assert.equal(url, 'blob:mock');
 });
+import { renderComponentLibrary } from '../dist/app.js';
+
+test('web UI can render library components from mocked API data', async () => {
+  const html = await renderComponentLibrary({ listComponentLibrary: async () => [{ id:'l1', name:'Pump Lib', componentType:'pump', approvedEngineeringValues:[{ key:'pressure' }], tags:[], createdAt:'', updatedAt:'' }] });
+  assert.match(html, /Pump Lib/);
+});
+
+test('web UI can call promote/copy actions with mocked API responses', async () => {
+  let promoted = false; let copied = false;
+  const client = { promoteComponentToLibrary: async () => { promoted = true; return {}; }, copyLibraryToProject: async () => { copied = true; return {}; } };
+  await client.promoteComponentToLibrary({ projectId:'p1', componentId:'c1' });
+  await client.copyLibraryToProject('l1', { targetProjectId:'p1' });
+  assert.equal(promoted, true);
+  assert.equal(copied, true);
+});

@@ -21,3 +21,33 @@ test('report sections export docx endpoint validates and returns file', async ()
 test('report sections export docx rejects missing projectId and empty selection', async () => { await withServer(async (base) => { const missingProject = await fetch(`${base}/report-sections/export-docx`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ projectId: '', reportSectionIds: ['x'] }) }); assert.equal(missingProject.status, 400); const emptySelection = await fetch(`${base}/report-sections/export-docx`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ projectId: 'p1', reportSectionIds: [] }) }); assert.equal(emptySelection.status, 400); }); });
 
 test('report sections export docx rejects section ids from another project', async () => { await withServer(async (base) => { const project1 = await createProject(base); const project2 = await (await fetch(`${base}/projects`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Project B', projectType: 'custom' }) })).json(); const created = await (await fetch(`${base}/report-sections/generate`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId:project2.id, sectionType:'missing_information', engineeringValues:[], missingInformation:['Need pressure rating'] }) })).json(); const res = await fetch(`${base}/report-sections/export-docx`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ projectId: project1.id, reportSectionIds: [created.id] }) }); assert.equal(res.status, 400); }); });
+
+test('component library promote/list/copy/compare flow', async () => { await withServer(async (base) => {
+  const project = await createProject(base);
+  const comp = await (await fetch(`${base}/components`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId:project.id, name:'Pump', type:'pump' }) })).json();
+  await fetch(`${base}/engineering-values`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId:project.id, componentId:comp.id, key:'pressure', label:'Pressure', value:200, valueType:'number', unit:'bar', status:'approved', sourceReferences:[] }) });
+  await fetch(`${base}/engineering-values`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId:project.id, componentId:comp.id, key:'draft', label:'Draft', value:10, valueType:'number', status:'needs_review', sourceReferences:[] }) });
+  const promotedRes = await fetch(`${base}/component-library/promote`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId:project.id, componentId:comp.id, tags:['std'] }) });
+  assert.equal(promotedRes.status, 201);
+  const promoted = await promotedRes.json();
+  assert.equal(promoted.approvedEngineeringValues.length, 1);
+  assert.equal(promoted.approvedEngineeringValues[0].key, 'pressure');
+  const listed = await (await fetch(`${base}/component-library?q=pump`)).json();
+  assert.equal(listed.length, 1);
+  const project2 = await (await fetch(`${base}/projects`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ name:'Project B', projectType:'custom' }) })).json();
+  await fetch(`${base}/components`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId:project2.id, name:'Existing', type:'pump' }) });
+  const copied = await (await fetch(`${base}/component-library/${promoted.id}/copy-to-project`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ targetProjectId: project2.id }) })).json();
+  assert.equal(copied.engineeringValues.length, 1);
+  const project2Values = await (await fetch(`${base}/engineering-values?projectId=${project2.id}`)).json();
+  assert.ok(project2Values.length >= 1);
+  const compare = await (await fetch(`${base}/component-library/${promoted.id}/compare`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ targetProjectId: project2.id, targetComponentId: copied.component.id }) })).json();
+  assert.equal(compare.matching.length, 1);
+}); });
+
+test('promotion fails when no eligible values exist', async () => { await withServer(async (base) => {
+  const project = await createProject(base);
+  const comp = await (await fetch(`${base}/components`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId:project.id, name:'Nope', type:'valve' }) })).json();
+  await fetch(`${base}/engineering-values`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId:project.id, componentId:comp.id, key:'x', label:'x', value:1, valueType:'number', status:'ai_extracted', sourceReferences:[] }) });
+  const res = await fetch(`${base}/component-library/promote`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId:project.id, componentId:comp.id }) });
+  assert.equal(res.status, 400);
+}); });

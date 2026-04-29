@@ -47,8 +47,12 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
       view.innerHTML = `
         <h2>${project.name}</h2>
         <p>${project.description ?? ''}</p>
+        
+        <h3>Component Library</h3>
+        <ul>${(await client.listComponentLibrary()).map((i) => `<li>${i.name} (${i.componentType}) [${i.approvedEngineeringValues.length}] <button data-library-copy-id="${i.id}">Copy to project</button> <button data-library-compare-id="${i.id}">Compare with first component</button></li>`).join('')}</ul>
+
         <h3>Components</h3>
-        <ul>${components.map((c) => `<li>${c.name} (${c.type})</li>`).join('')}</ul>
+        <ul>${components.map((c) => `<li>${c.name} (${c.type}) <button data-promote-component-id=\"${c.id}\">Promote</button></li>`).join('')}</ul>
         <form id="component-form"><input name="name" placeholder="Component name" required/><input name="type" placeholder="Type" required/><button>Add component</button></form>
         <h3>Engineering values</h3>
         ${valuesByComponent.map(({ component, values: componentValues }) => `<h4>${component.name}</h4><ul>${componentValues.map((v) => `<li>${v.label}: ${String(v.value)} ${v.unit ?? ''} [${v.status}] <button data-status-id="${v.id}" data-status="approved">Approve</button> <button data-status-id="${v.id}" data-status="rejected">Reject</button></li>`).join('')}</ul>`).join('')}
@@ -173,6 +177,22 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
         }
       };
 
+
+      view.querySelectorAll<HTMLButtonElement>('button[data-promote-component-id]').forEach((btn) => {
+        btn.onclick = async () => { await client.promoteComponentToLibrary({ projectId, componentId: btn.dataset.promoteComponentId! }); await load(); };
+      });
+      view.querySelectorAll<HTMLButtonElement>('button[data-library-copy-id]').forEach((btn) => {
+        btn.onclick = async () => { await client.copyLibraryToProject(btn.dataset.libraryCopyId!, { targetProjectId: projectId }); await load(); };
+      });
+      view.querySelectorAll<HTMLButtonElement>('button[data-library-compare-id]').forEach((btn) => {
+        btn.onclick = async () => {
+          const firstComponent = components[0];
+          if (!firstComponent) { alert('Add a component first'); return; }
+          const result = await client.compareLibraryWithComponent(btn.dataset.libraryCompareId!, { targetProjectId: projectId, targetComponentId: firstComponent.id });
+          alert(`Compare: matching=${result.matching.length}, differing=${result.differing.length}, missing=${result.missingInTarget.length}, extra=${result.extraInTarget.length}`);
+        };
+      });
+
       (view.querySelector('#calc-form') as HTMLFormElement).onsubmit = async (e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget as HTMLFormElement);
@@ -198,3 +218,5 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
   window.addEventListener('hashchange', () => { void load(); });
   void load();
 }
+
+export async function renderComponentLibrary(client: ApiClient): Promise<string> { const items = await client.listComponentLibrary(); return items.map((i) => `<li>${i.name} (${i.componentType}) [${i.approvedEngineeringValues.length} values] <button data-library-copy-id="${i.id}">Copy to project</button></li>`).join(''); }

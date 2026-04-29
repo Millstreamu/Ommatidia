@@ -136,3 +136,7 @@ Key fields:
 ## Validation approach
 
 All entities above are defined as runtime schemas and inferred TypeScript types in `packages/shared`, so consuming packages can both validate external data and use strongly typed model contracts.
+
+## Component library model
+
+Added a shared `ComponentLibraryItem` model containing component metadata, approved engineering values snapshot, source references, origin references, tags, and timestamps.

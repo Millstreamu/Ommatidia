@@ -31,3 +31,9 @@ Project detail pages include a Report Sections area where users can generate det
 ## Word export for report sections
 
 Users can export saved report sections to a Microsoft Word `.docx` document from the Report Sections area. The export includes report title, project name, generated timestamp, selected sections in user-specified order, and optional source references.
+
+## Reusable component library workflows
+
+- Promote project component data to reusable library entries from approved or user_entered values only.
+- Copy library components into projects without overwriting existing project values.
+- Compare a library component against a project component with matching/differing/missing/extra buckets.

@@ -59,3 +59,7 @@ The system now supports deterministic, template-based report section generation 
 ## Word export
 
 Report sections can now be exported deterministically as `.docx` files via the API endpoint `POST /report-sections/export-docx`. Export generation lives in `packages/reports` and supports ordered section selection, optional source-reference inclusion, and deterministic markdown subset rendering (headings, paragraphs, bullets, numbered lists, and simple pipe tables).
+
+## Reusable component library
+
+The API now includes an in-memory reusable component library for promoting approved/user-entered component values, listing/searching, copying into projects, and compare-only diff operations.
