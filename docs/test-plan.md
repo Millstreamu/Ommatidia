@@ -46,6 +46,8 @@ This test plan defines acceptance criteria and validation strategy for existing 
 - [ ] Extracted values do not overwrite approved values.
 - [ ] Missing files return clear errors.
 - [ ] Invalid AI responses are not saved.
+- [ ] Model candidates missing system metadata are normalized safely before validation/save.
+- [ ] Dropped candidates show safe, specific reasons in API/UI warnings.
 
 ### Extraction provider switching
 - [ ] User can switch extraction provider between mock and OpenAI from header controls.
@@ -199,3 +201,6 @@ Package-focused (optional):
 
 - [x] Task 16A: OpenAI extraction failures classify auth/permission/rate/timeout/model/bad-request/network errors and expose only safe diagnostics in API logs/UI.
 - [x] Task 16B: OpenAI smoke test endpoint + UI button + safe empty-output diagnostics/parsing distinctions (empty vs invalid JSON vs schema invalid vs unsupported shape vs no document content).
+
+
+- [x] Task 16C: Candidate normalization + safe dropped-candidate diagnostics + UI warning detail for extraction drops.

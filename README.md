@@ -181,6 +181,7 @@ EXTRACTION_PROVIDER=mock npm run start --workspace @ommatidia/api
 - `invalid_model_response`: provider returned no parseable output text; check safe diagnostics (model/response id/output item types/status and whether document content was included).
 - `invalid_json_response`: model returned text that was not valid JSON.
 - `schema_invalid_response`: model returned JSON that failed required extraction schema fields.
+- `Dropped candidate failed schema validation`: OpenAI returned candidate data, but one or more candidates did not match required value fields; the app now reports concise safe reasons (for example missing value, invalid valueType, or invalid sourceReferences shape).
 - `unsupported_response_shape`: provider response shape was unexpected for configured parsing path.
 - `file_not_found` / `unsupported_file_type`: re-upload a supported document.
 

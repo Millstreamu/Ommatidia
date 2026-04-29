@@ -50,6 +50,18 @@ export function renderExtractionProviderControls(status?: SystemStatus): string 
 
 
 
+
+export function renderDroppedCandidateWarnings(attempt: { diagnostics?: Record<string, unknown> }): string {
+  const dropped = Array.isArray((attempt.diagnostics as { droppedCandidates?: unknown[] } | undefined)?.droppedCandidates)
+    ? ((attempt.diagnostics as { droppedCandidates?: Array<{ candidateIdentifier?: string; reasonCode?: string; validationIssueMessages?: string[] }> }).droppedCandidates ?? [])
+    : [];
+  if (!dropped.length) return '';
+  return dropped.map((item) => {
+    const id = item.candidateIdentifier ? `‘${item.candidateIdentifier}’` : 'candidate';
+    const detail = item.validationIssueMessages?.[0] ?? item.reasonCode ?? 'failed schema validation';
+    return `Dropped ${id}: ${detail}.`;
+  }).join(' | ');
+}
 export function formatExtractionFailure(err: Error & { extractionError?: { errorCode?: string; message?: string; retryable?: boolean; userAction?: string; details?: Record<string, unknown> } }): string {
   const extractionError = err.extractionError;
   if (!extractionError) return `Error: ${err.message || 'Extraction failed.'}`;
@@ -185,7 +197,7 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
       (view.querySelector('#component-form') as HTMLFormElement).onsubmit = async (e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); await client.createComponent({ projectId, name: String(fd.get('name')), type: String(fd.get('type')) }); await load(); };
       (view.querySelector('#value-form') as HTMLFormElement).onsubmit = async (e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const raw = Object.fromEntries(fd.entries()) as Record<string, string>; const errors = validateEngineeringValueForm(raw); if (errors.length) { alert(errors.join(', ')); return; } const parsedValue = raw.valueType === 'number' ? Number(raw.value) : raw.valueType === 'boolean' ? raw.value === 'true' : raw.value; await client.createEngineeringValue({ projectId, componentId: raw.componentId, key: raw.key, label: raw.label, value: parsedValue, valueType: raw.valueType, unit: raw.unit || undefined, status: raw.status || 'user_entered' }); await load(); };
       view.querySelectorAll<HTMLButtonElement>('button[data-extract-doc-id]').forEach((btn) => { btn.onclick = async () => { const statusEl = view.querySelector(`#extract-status-${btn.dataset.extractDocId!}`) as HTMLElement; statusEl.textContent = 'Extracting...'; try { const result = await client.extractValues({ projectId, documentId: btn.dataset.extractDocId! }); statusEl.textContent = `Success: provider ${result.providerMetadata?.provider ?? 'unknown'} | created ${result.valuesCreatedCount ?? result.candidateValues.length} value(s). ${result.warnings?.[0] ?? ''}`; await load(); } catch (error) { const err = error as Error & { extractionError?: { errorCode?: string; message?: string; retryable?: boolean; userAction?: string; details?: Record<string, unknown> } }; statusEl.textContent = formatExtractionFailure(err); } }; });
-      for (const d of documents) { const attempts = await client.listExtractionAttempts(projectId, d.id); const el = view.querySelector(`#extract-attempts-${d.id}`) as HTMLElement | null; if (el) el.innerHTML = attempts.map((a) => `<li><strong>${a.status}</strong> | provider: ${a.provider} | created: ${a.valuesCreatedCount}${a.valuesCreatedCount===0?' (zero values)':''} | ${a.errorCode ?? 'no error'}${a.warnings?.length?`<br/><span style="color:#92400e;">${a.warnings.join(' | ')}</span>`:''}${a.safeErrorMessage?`<br/><span style="color:#b91c1c;">${a.safeErrorMessage}</span>`:''}</li>`).join(''); }
+      for (const d of documents) { const attempts = await client.listExtractionAttempts(projectId, d.id); const el = view.querySelector(`#extract-attempts-${d.id}`) as HTMLElement | null; if (el) el.innerHTML = attempts.map((a) => { const droppedSummary = renderDroppedCandidateWarnings(a); return `<li><strong>${a.status}</strong> | provider: ${a.provider} | created: ${a.valuesCreatedCount}${a.valuesCreatedCount===0?' (zero values)':''} | ${a.errorCode ?? 'no error'}${a.warnings?.length?`<br/><span style="color:#92400e;">${a.warnings.join(' | ')}</span>`:''}${droppedSummary?`<br/><span style="color:#92400e;">${droppedSummary}</span>`:''}${a.safeErrorMessage?`<br/><span style="color:#b91c1c;">${a.safeErrorMessage}</span>`:''}</li>`; }).join(''); }
       view.querySelectorAll<HTMLButtonElement>('button[data-retry-doc-id]').forEach((btn) => { btn.onclick = () => { view.querySelector<HTMLButtonElement>(`button[data-extract-doc-id="${btn.dataset.retryDocId!}"]`)?.click(); }; });
       view.querySelectorAll<HTMLButtonElement>('button[data-status-id]').forEach((btn) => { btn.onclick = async () => { await client.updateEngineeringValueStatus(btn.dataset.statusId!, btn.dataset.status as 'approved' | 'rejected'); await load(); }; });
       (view.querySelector('#document-form') as HTMLFormElement).onsubmit = async (e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const selectedFile = fd.get('file'); if (!(selectedFile instanceof File)) { alert('File is required'); return; } await client.uploadDocument(projectId, selectedFile, String(fd.get('documentType') || 'other')); await load(); };

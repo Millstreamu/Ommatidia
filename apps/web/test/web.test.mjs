@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject } from '../dist/app.js';
+import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings } from '../dist/app.js';
 import { startWebApp } from '../dist/index.js';
 import { createServer } from 'node:http';
 import { ApiClient } from '../dist/apiClient.js';
@@ -247,4 +247,10 @@ test('UI formats safe extraction diagnostics for users', () => {
   assert.match(text, /Retryable: no/);
   assert.match(text, /Check the configured model name/);
   assert.match(text, /The model does not exist/);
+});
+
+
+test('UI renders concise dropped-candidate warnings', () => {
+  const text = renderDroppedCandidateWarnings({ diagnostics: { droppedCandidates: [{ candidateIdentifier: 'rated pressure', validationIssueMessages: ['value is required'], reasonCode: 'missing_value' }] } });
+  assert.match(text, /Dropped ‘rated pressure’: value is required\./);
 });
