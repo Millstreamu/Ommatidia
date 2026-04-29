@@ -63,3 +63,5 @@ Report sections can now be exported deterministically as `.docx` files via the A
 ## Reusable component library
 
 The API now includes an in-memory reusable component library for promoting approved/user-entered component values, listing/searching, copying into projects, and compare-only diff operations.
+
+- OpenAI extraction now reads uploaded PDF/image bytes and sends them to the model as file input; if unreadable, API returns explicit warning/error instead of silent zero-value success. OCR is not implemented, so image-only/scanned PDFs may still return no values.

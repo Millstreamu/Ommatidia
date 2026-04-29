@@ -193,3 +193,5 @@ Package-focused (optional):
 4. Preserve AI extraction safety: no silent overwrite of approved values and explicit review statuses.
 5. Run and report `npm run typecheck` and `npm run test` before completion.
 6. Report failures honestly and document any justified temporary gaps in **Known gaps**.
+
+- [x] Task 16: OpenAI extraction zero-value diagnostics visible in API/UI attempts; warnings required when valuesCreatedCount=0.
