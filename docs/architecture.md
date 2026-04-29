@@ -32,3 +32,7 @@
 - The web client calls API endpoints in `apps/api` through a small reusable API client module; deterministic calculations are executed through the API, not directly in the UI.
 - A basic Hydraulic Power module form is included and posts inputs (`flowLpm`, `pressureBar`, `efficiency`) to the hydraulic calculation endpoint.
 - This initial UI intentionally supports manual entry only; AI extraction workflows will be added later.
+
+## Document upload
+
+The API now supports local development uploads for PDF/image files to project-scoped document records. Files are written to `storage/uploads/` with generated unique stored filenames, while metadata is tracked in the document model and served through `/documents` endpoints. This implementation is intentionally local-only for development and should move to managed object storage later. No AI extraction, OCR, or content parsing is performed in this stage.
