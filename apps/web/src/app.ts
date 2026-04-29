@@ -41,6 +41,8 @@ export function renderExtractionProviderControls(status?: SystemStatus): string 
         <option value="openai" ${status.extractionProvider === 'openai' ? 'selected' : ''} ${openAiDisabled}>OpenAI</option>
       </select>
     </label>
+    <div style="margin-top:8px;display:flex;gap:8px;align-items:center;"><button id="openai-smoke-test-btn" type="button">Test OpenAI</button><span style="font-size:12px;color:#334155;">Small connectivity/configuration test only (not document extraction).</span></div>
+    <div id="openai-smoke-test-status" style="font-size:12px;margin-top:6px;color:#334155;"></div>
     <div id="extraction-provider-error" style="color:#b91c1c;font-size:12px;margin-top:6px;"></div>
     ${note}
   </div>`;
@@ -131,6 +133,19 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
           } catch (error) {
             select.value = previous;
             if (errorEl) errorEl.textContent = `Could not switch provider: ${(error as Error).message}`;
+          }
+        };
+      }
+      const smokeBtn = statusContainer.querySelector('#openai-smoke-test-btn') as HTMLButtonElement | null;
+      const smokeStatus = statusContainer.querySelector('#openai-smoke-test-status') as HTMLElement | null;
+      if (smokeBtn) {
+        smokeBtn.onclick = async () => {
+          if (smokeStatus) smokeStatus.textContent = 'Testing OpenAI...';
+          try {
+            const result = await client.testOpenAi();
+            if (smokeStatus) smokeStatus.textContent = result.ok ? 'OpenAI test succeeded' : `OpenAI test failed: ${result.message}`;
+          } catch (error) {
+            if (smokeStatus) smokeStatus.textContent = `OpenAI test failed: ${(error as Error).message}`;
           }
         };
       }

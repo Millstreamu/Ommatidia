@@ -238,3 +238,19 @@ test('extraction uses selected runtime provider for attempts', async () => {
     if (prevKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = prevKey;
   }
 });
+
+
+test('openai smoke test returns safe not-configured response when key missing', async () => {
+  const prevKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+  try {
+    await withServer(async (base) => {
+      const res = await fetch(`${base}/system/openai-smoke-test`);
+      assert.ok(res.status === 502 || res.status === 401);
+      const body = await res.json();
+      assert.equal(body.ok, false);
+      assert.equal(body.provider, 'openai');
+      assert.doesNotMatch(JSON.stringify(body), /unit-test-key|super-secret|Bearer\s+/i);
+    });
+  } finally { if (prevKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = prevKey; }
+});

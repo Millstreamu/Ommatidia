@@ -53,6 +53,8 @@ Notes:
 - If the web UI appears blank, open the browser developer console and check for JavaScript errors.
 - In GitHub Codespaces, opening forwarded port `3000` is enough for normal app use because browser API calls go to same-origin `/api` and are proxied by the web server to the internal API process on port `3001`.
 - Header status badge shows OpenAI/extraction mode from backend `/api/system/status`; it only checks server configuration and does not display or validate the actual API key.
+- "OpenAI connected" means the server has an API key configured; it is not a full extraction health check.
+- Use "Test OpenAI" in the header to run a tiny live connectivity/configuration request that sends no user document content.
 - Header includes an extraction provider switch (Mock/OpenAI) that updates runtime server mode via `/api/system/extraction-provider` without restart.
 - Mock mode is safe for testing and does not call OpenAI.
 - OpenAI mode may use API credits when extraction is run.
@@ -176,7 +178,10 @@ EXTRACTION_PROVIDER=mock npm run start --workspace @ommatidia/api
 - `rate_limited`: wait and retry; retries are automatic up to `EXTRACTION_MAX_RETRIES`.
 - `network_failure`: transient connectivity issue between API server and provider.
 - `provider_unavailable`: fallback when failure cannot be classified safely; retry later and inspect provider status.
-- `invalid_json_response` / `invalid_model_response`: provider output was malformed and is intentionally rejected/safeguarded.
+- `invalid_model_response`: provider returned no parseable output text; check safe diagnostics (model/response id/output item types/status and whether document content was included).
+- `invalid_json_response`: model returned text that was not valid JSON.
+- `schema_invalid_response`: model returned JSON that failed required extraction schema fields.
+- `unsupported_response_shape`: provider response shape was unexpected for configured parsing path.
 - `file_not_found` / `unsupported_file_type`: re-upload a supported document.
 
 - Word report export is generated deterministically in `@ommatidia/reports` and returned as `.docx` from the API.

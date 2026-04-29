@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MockExtractionService, OpenAiExtractionService, RetryingExtractionService } from '../dist/index.js';
+import { MockExtractionService, OpenAiExtractionService, RetryingExtractionService, runOpenAiSmokeTest } from '../dist/index.js';
 
 const doc = { id:'d',projectId:'p',originalFilename:'a.pdf',storedFilename:'a.pdf',mimeType:'application/pdf',fileSizeBytes:1,documentType:'datasheet',uploadStatus:'uploaded',processingStatus:'uploaded',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString() };
 
@@ -18,3 +18,8 @@ test('invalid json response returns invalid_json_response', async () => { const 
 test('openai zero values adds visible warning', async () => { const svc = new OpenAiExtractionService({ responses: { create: async () => ({ output_text: '{"candidateValues":[],"missingInformation":[],"warnings":[]}' }) } }); const result = await call(svc); assert.match(result.warnings.join(' | '), /No engineering values were extracted/i); });
 test('errors never include api key or authorization', async () => { const svc = new OpenAiExtractionService({ responses: { create: async () => { const e = new Error('Authorization: Bearer sk-test-secret'); e.status = 500; throw e; } } }); await assert.rejects(() => call(svc), (err) => !JSON.stringify(err.payload).includes('sk-test-secret') && !JSON.stringify(err.payload).toLowerCase().includes('authorization')); });
 test('timeout returns request_timeout', async () => { const slow = { extractEngineeringValues: async () => { await new Promise((r) => setTimeout(r, 50)); return { candidateValues: [], missingInformation: [], warnings: [] }; } }; const svc = new RetryingExtractionService(slow, 1, 0); await assert.rejects(() => svc.extractEngineeringValues({}), /timed out/); });
+
+
+test('empty output returns invalid_model_response with safe diagnostics', async () => { const svc = new OpenAiExtractionService({ responses: { create: async () => ({ id:'resp_1', status:'completed', output:[{ type:'message', content:[] }] }) } }, 'gpt-x'); await assert.rejects(() => call(svc), (err) => err.payload.errorCode === 'invalid_model_response' && err.payload.details.responseId === 'resp_1'); });
+test('schema invalid output is not labelled empty output', async () => { const svc = new OpenAiExtractionService({ responses: { create: async () => ({ output_text: '{"candidateValues":123,"missingInformation":[],"warnings":[]}' }) } }); await assert.rejects(() => call(svc), (err) => err.payload.errorCode === 'schema_invalid_response'); });
+test('smoke test does not expose API key on failure', async () => { const old=process.env.OPENAI_API_KEY; process.env.OPENAI_API_KEY='sk-super-secret'; const result = await runOpenAiSmokeTest(); assert.doesNotMatch(JSON.stringify(result), /sk-super-secret/); if (old===undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY=old; });
