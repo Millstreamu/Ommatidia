@@ -46,21 +46,21 @@ test -n "$OPENAI_API_KEY" && echo "OPENAI_API_KEY is set" || echo "OPENAI_API_KE
 Notes:
 - `setup` installs dependencies, creates `.env` from `.env.example` only when `.env` is missing, and prepares `storage/uploads/`.
 - `start` launches API and web together for local development.
-- Default local URLs: API `http://localhost:3001`, Web `http://localhost:3000` (opening this URL shows the Projects page by default).
+- Default local URLs: Web `http://localhost:3000` (opening this URL shows the Projects page by default). The web app proxies same-origin `/api/*` requests to the API server at `http://127.0.0.1:3001/*`.
 - `reset-local` deletes local development uploads in `storage/uploads` and recreates the folder; it does not delete `.env`.
 - In GitHub Codespaces, `OPENAI_API_KEY` can be provided via Codespaces/repository secrets or environment variables.
 - The default extraction provider is `mock`, so real OpenAI credentials are not required for basic local startup.
 - If the web UI appears blank, open the browser developer console and check for JavaScript errors.
-- In GitHub Codespaces, use forwarded port `3000` for web and forwarded port `3001` for API; the web app automatically maps the forwarded `3000` hostname to `3001` for API calls.
+- In GitHub Codespaces, opening forwarded port `3000` is enough for normal app use because browser API calls go to same-origin `/api` and are proxied by the web server to the internal API process on port `3001`.
 
 
 ### Troubleshooting web/API connection in Codespaces
 
-- Web UI runs on port **3000**.
-- API runs on port **3001**.
-- In GitHub Codespaces, both ports must be running and forwarded.
-- If the Projects page shows `Failed to fetch`, verify port 3001 is running and forwarded, then retry.
-- Browser requests between `...-3000.app.github.dev` and `...-3001.app.github.dev` rely on API CORS headers; if API is down or not forwarded, requests fail in-browser even if local curl worked earlier.
+- Web UI runs on port **3000** (forward/open this port in browser).
+- API process still runs on port **3001** internally.
+- Browser requests now use same-origin `/api` on port 3000, and the web server proxies to `http://127.0.0.1:3001`.
+- If the Projects page shows `Failed to fetch`, verify both dev processes are running (`make start`), then refresh.
+- You should not need to forward port 3001 for normal app usage.
 
 ## Repository layout
 

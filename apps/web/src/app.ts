@@ -1,11 +1,8 @@
 import { ApiClient } from './apiClient.js';
 
 
-export function resolveApiBaseUrl(hostname: string): string {
-  if (hostname.includes('.app.github.dev') && hostname.includes('-3000.')) {
-    return `https://${hostname.replace('-3000.', '-3001.')}`;
-  }
-  return 'http://127.0.0.1:3001';
+export function resolveApiBaseUrl(_hostname: string): string {
+  return '/api';
 }
 
 const STATUS_COLORS: Record<string, string> = {

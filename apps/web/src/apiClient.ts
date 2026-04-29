@@ -12,7 +12,7 @@ export interface HydraulicPowerResponse { moduleId: string; projectId: string; i
 function toHelpfulNetworkError(error: unknown): Error {
   const message = (error as Error)?.message ?? '';
   if (message.includes('Failed to fetch') || message.includes('NetworkError') || message.includes('fetch')) {
-    return new Error('Could not reach the API. Check that port 3001 is running and forwarded.');
+    return new Error('Could not reach the API. Check that the web server is running on port 3000 and API proxy /api is reachable.');
   }
   return error instanceof Error ? error : new Error('Unknown network error');
 }
