@@ -86,14 +86,45 @@ test('Word export button helper calls API and handles file response', async () =
   global.URL = originalURL;
 });
 
-
-test('web root serves app shell with mount script and fallback error UI', async () => {
+test('web root serves html with loading state and mount script', async () => {
   await withWebServer(async (base) => {
     const res = await fetch(base + '/');
     assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type') ?? '', /text\/html/);
     const html = await res.text();
+    assert.match(html, /Loading Engineering Design Assistant/);
     assert.match(html, /mountApp/);
-    assert.match(html, /Application failed to load/);
     assert.match(html, /resolveApiBaseUrl/);
+    assert.doesNotMatch(html, /^\s*\[/);
+  });
+});
+
+test('web serves app.js as javascript with valid module import', async () => {
+  await withWebServer(async (base) => {
+    const res = await fetch(base + '/app.js');
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type') ?? '', /application\/javascript/);
+    const body = await res.text();
+    assert.match(body, /import\s+\{\s*ApiClient\s*\}\s+from\s+'\.\/apiClient\.js';/);
+    assert.doesNotMatch(body, /import\s+\{\s*ApiClient\s*\}\s*\n/);
+  });
+});
+
+test('web serves apiClient.js as javascript module and not html', async () => {
+  await withWebServer(async (base) => {
+    const res = await fetch(base + '/apiClient.js');
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type') ?? '', /application\/javascript/);
+    const body = await res.text();
+    assert.match(body, /export\s+class\s+ApiClient/);
+    assert.doesNotMatch(body, /<!doctype html>/i);
+  });
+});
+
+test('unknown javascript path returns 404', async () => {
+  await withWebServer(async (base) => {
+    const res = await fetch(base + '/missing-module.js');
+    assert.equal(res.status, 404);
+    assert.match(res.headers.get('content-type') ?? '', /text\/plain/);
   });
 });
