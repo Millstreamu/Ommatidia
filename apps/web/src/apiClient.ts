@@ -8,7 +8,7 @@ export interface HydraulicPowerResponse { moduleId: string; projectId: string; i
 
 export class ApiClient {
   constructor(private readonly baseUrl: string) {}
-  private async request<T>(path: string, init?: RequestInit): Promise<T> { const response = await fetch(`${this.baseUrl}${path}`, { ...init, headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) } }); if (!response.ok) throw new Error(`API request failed (${response.status}): ${await response.text()}`); return response.json() as Promise<T>; }
+  private async request<T>(path: string, init?: RequestInit): Promise<T> { const response = await fetch(`${this.baseUrl}${path}`, { ...init, headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) } }); if (!response.ok) { let body: any = undefined; try { body = await response.json(); } catch {} const err = new Error(body?.message ?? `API request failed (${response.status})`) as Error & { extractionError?: ExtractionErrorResponse }; if (body?.errorCode) err.extractionError = body as ExtractionErrorResponse; throw err; } return response.json() as Promise<T>; }
   listProjects() { return this.request<Project[]>('/projects'); }
   createProject(input: { name: string; description?: string; projectType: string }) { return this.request<Project>('/projects', { method: 'POST', body: JSON.stringify(input) }); }
   getProject(projectId: string) { return this.request<Project>(`/projects/${projectId}`); }
@@ -26,6 +26,9 @@ export class ApiClient {
   }
   hydraulicPowerKw(input: { projectId: string; flowLpm: number; pressureBar: number; efficiency: number }) { return this.request<HydraulicPowerResponse>('/calculations/hydraulic-power-kw', { method: 'POST', body: JSON.stringify(input) }); }
   extractValues(input: { projectId: string; documentId: string; extractionTarget?: { componentType?: string; moduleType?: string } }) { return this.request<ExtractionResult>('/extractions', { method: 'POST', body: JSON.stringify(input) }); }
+  listExtractionAttempts(projectId: string, documentId: string) { return this.request<ExtractionAttempt[]>(`/extractions/attempts?projectId=${projectId}&documentId=${documentId}`); }
 }
 
-export interface ExtractionResult { candidateValues: EngineeringValue[]; missingInformation: string[]; warnings: string[]; providerMetadata?: { provider: string; model?: string } }
+export interface ExtractionErrorResponse { errorCode: string; message: string; retryable: boolean; userAction?: string; details?: Record<string, unknown>; timestamp: string }
+export interface ExtractionResult { candidateValues: EngineeringValue[]; missingInformation: string[]; warnings: string[]; providerMetadata?: { provider: string; model?: string }; valuesCreatedCount?: number }
+export interface ExtractionAttempt { id: string; projectId: string; documentId: string; provider: string; status: 'pending'|'succeeded'|'failed'; startedAt: string; completedAt?: string; errorCode?: string; safeErrorMessage?: string; valuesCreatedCount: number }

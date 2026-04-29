@@ -47,3 +47,7 @@ The first extraction pipeline is synchronous and runs inside `apps/api`:
 5. Approved values are never overwritten by extraction writes.
 
 No background jobs, OCR pipeline, or report generation side effects are included in this phase.
+
+## Extraction error handling
+
+Extraction uses typed normalized errors with codes, retryable flags, safe details, and timestamps. API endpoints map extraction errors to stable HTTP status codes and never crash the server. Failed extraction attempts are tracked in-memory at service/repository level (`pending|succeeded|failed`) with provider, project/document IDs, and safe error messages to support UI history and future PostgreSQL migration.

@@ -80,3 +80,24 @@ API uploads are stored in `storage/uploads/` for local development only. The fol
 - Set `OPENAI_API_KEY` to use real OpenAI extraction.
 - By default, the API uses a deterministic mock extraction service for tests/local development.
 - AI extracted values are candidate data only and must be reviewed/approved before final use.
+
+## Extraction environment variables
+
+- `EXTRACTION_PROVIDER` (`mock` or `openai`)
+- `OPENAI_API_KEY` (required only for `openai`)
+- `EXTRACTION_TIMEOUT_MS` (default `15000`)
+- `EXTRACTION_MAX_RETRIES` (default `2`)
+
+## Run with mock extraction
+
+```bash
+EXTRACTION_PROVIDER=mock npm run start --workspace @ommatidia/api
+```
+
+## Troubleshooting extraction errors
+
+- `missing_api_key`: set `OPENAI_API_KEY` or switch to `EXTRACTION_PROVIDER=mock`.
+- `request_timeout`: increase `EXTRACTION_TIMEOUT_MS` or retry.
+- `rate_limited`/`provider_unavailable`: retry later; retries are automatic up to `EXTRACTION_MAX_RETRIES`.
+- `invalid_json_response` / `invalid_model_response`: provider output was malformed and is intentionally rejected/safeguarded.
+- `file_not_found` / `unsupported_file_type`: re-upload a supported document.
