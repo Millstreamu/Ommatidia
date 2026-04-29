@@ -30,6 +30,11 @@ export class ApiClient {
   generateReportSection(input: { projectId: string; componentId?: string; sectionType: 'component_summary' | 'calculation_summary' | 'assumptions_and_warnings' | 'missing_information' | 'source_references'; engineeringValues: EngineeringValue[]; missingInformation?: string[]; assumptions?: string[]; warnings?: string[] }) { return this.request<ReportSection>('/report-sections/generate', { method: 'POST', body: JSON.stringify(input) }); }
   listReportSections(projectId: string) { return this.request<ReportSection[]>(`/report-sections?projectId=${projectId}`); }
   updateReportSection(id: string, input: { title?: string; bodyMarkdown?: string; status?: string }) { return this.request<ReportSection>(`/report-sections/${id}`, { method: 'PATCH', body: JSON.stringify(input) }); }
+  async exportReportSectionsDocx(input: { projectId: string; reportSectionIds: string[]; documentTitle?: string; includeSourceReferences?: boolean }) {
+    const response = await fetch(`${this.baseUrl}/report-sections/export-docx`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) });
+    if (!response.ok) throw new Error(`API request failed (${response.status})`);
+    return response.blob();
+  }
 }
 
 

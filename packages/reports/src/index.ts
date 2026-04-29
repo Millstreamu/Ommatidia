@@ -1,117 +1,15 @@
+import { spawnSync } from 'node:child_process';
 import type { CalculationResult, DataStatus, EngineeringValue, ReportSection, SourceReference } from '@ommatidia/shared';
-
-export type ReportSectionType =
-  | 'component_summary'
-  | 'calculation_summary'
-  | 'assumptions_and_warnings'
-  | 'missing_information'
-  | 'source_references';
-
-export interface ReportGenerationInput {
-  projectId: string;
-  componentId?: string;
-  sectionType: ReportSectionType;
-  engineeringValues: EngineeringValue[];
-  calculationResults?: CalculationResult[];
-  missingInformation?: string[];
-  assumptions?: string[];
-  warnings?: string[];
-  sourceReferences?: SourceReference[];
-  includedStatuses?: DataStatus[];
-}
-
-const DEFAULT_INCLUDED_STATUSES: DataStatus[] = ['approved', 'user_entered'];
-
-function normalizeValue(value: EngineeringValue['value']): string {
-  return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
-    ? String(value)
-    : JSON.stringify(value);
-}
-
-function uniqueStrings(values: string[]): string[] {
-  return Array.from(new Set(values.filter((value) => value.trim())));
-}
-
-function mergeSourceReferences(input: ReportGenerationInput, filteredValues: EngineeringValue[]): SourceReference[] {
-  return [...(input.sourceReferences ?? []), ...filteredValues.flatMap((value) => value.sourceReferences)];
-}
-
-export function generateReportSection(input: ReportGenerationInput): ReportSection {
-  const now = new Date().toISOString();
-  const includedStatuses = input.includedStatuses ?? DEFAULT_INCLUDED_STATUSES;
-  const filteredValues = input.engineeringValues.filter((value) => {
-    if (value.projectId !== input.projectId) return false;
-    if (input.componentId && value.componentId !== input.componentId) return false;
-    return includedStatuses.includes(value.status);
-  });
-
-  const sourceReferences = mergeSourceReferences(input, filteredValues);
-
-  const sectionTemplates: Record<ReportSectionType, { title: string; body: () => string }> = {
-    component_summary: {
-      title: 'Component Summary',
-      body: () => [
-        '## Included Engineering Values',
-        ...filteredValues.map((value) => `- **${value.label}** (${value.key}): ${normalizeValue(value.value)}${value.unit ? ` ${value.unit}` : ''} _[${value.status}]_`),
-        filteredValues.length === 0 ? '- No approved or user-entered values available.' : ''
-      ].filter(Boolean).join('\n')
-    },
-    calculation_summary: {
-      title: 'Calculation Summary',
-      body: () => {
-        const results = (input.calculationResults ?? []).filter((result) => result.projectId === input.projectId);
-        if (results.length === 0) return '## Calculation Outputs\n- No deterministic calculation results available.';
-        return [
-          '## Calculation Outputs',
-          ...results.map((result) => [
-            `### ${result.moduleId}`,
-            ...result.outputs.map((output) => `- **${output.label}**: ${String(output.value)}${output.unit ? ` ${output.unit}` : ''}`)
-          ].join('\n'))
-        ].join('\n');
-      }
-    },
-    assumptions_and_warnings: {
-      title: 'Assumptions and Warnings',
-      body: () => {
-        const assumptions = uniqueStrings([...(input.assumptions ?? []), ...((input.calculationResults ?? []).flatMap((result) => result.assumptions))]);
-        const warnings = uniqueStrings([...(input.warnings ?? []), ...((input.calculationResults ?? []).flatMap((result) => result.warnings))]);
-        return [
-          '## Assumptions',
-          ...(assumptions.length > 0 ? assumptions.map((item) => `- ${item}`) : ['- None provided.']),
-          '',
-          '## Warnings',
-          ...(warnings.length > 0 ? warnings.map((item) => `- ${item}`) : ['- None provided.'])
-        ].join('\n');
-      }
-    },
-    missing_information: {
-      title: 'Missing Information',
-      body: () => {
-        const missing = uniqueStrings(input.missingInformation ?? []);
-        return ['## Missing Information', ...(missing.length > 0 ? missing.map((item) => `- ${item}`) : ['- No missing information reported.'])].join('\n');
-      }
-    },
-    source_references: {
-      title: 'Source References',
-      body: () => {
-        if (sourceReferences.length === 0) return '## Source References\n- No source references available.';
-        return [
-          '## Source References',
-          ...sourceReferences.map((source) => `- Document: ${source.documentId}${source.pageNumber ? `, Page: ${source.pageNumber}` : ''}${source.sectionTitle ? `, Section: ${source.sectionTitle}` : ''}${source.sourceText ? `\n  - Excerpt: ${source.sourceText}` : ''}`)
-        ].join('\n');
-      }
-    }
-  };
-
-  const sectionTemplate = sectionTemplates[input.sectionType];
-  return {
-    id: `rep-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    projectId: input.projectId,
-    title: sectionTemplate.title,
-    bodyMarkdown: sectionTemplate.body(),
-    sourceReferences,
-    status: 'needs_review',
-    createdAt: now,
-    updatedAt: now
-  };
-}
+// ... keep types
+export type ReportSectionType = 'component_summary'|'calculation_summary'|'assumptions_and_warnings'|'missing_information'|'source_references';
+export interface ReportGenerationInput { projectId:string; componentId?:string; sectionType:ReportSectionType; engineeringValues:EngineeringValue[]; calculationResults?:CalculationResult[]; missingInformation?:string[]; assumptions?:string[]; warnings?:string[]; sourceReferences?:SourceReference[]; includedStatuses?:DataStatus[]; }
+export interface ReportDocxExportInput { projectId:string; projectName:string; selectedSections:ReportSection[]; documentTitle?:string; generatedBy?:string; generatedAt?:string; includeSourceReferences?:boolean; }
+const DEFAULT_INCLUDED_STATUSES: DataStatus[] = ['approved','user_entered'];
+const escapeXml=(s:string)=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+function markdownLines(md:string):string[]{ return md.split(/\r?\n/).flatMap((line)=>{const t=line.trim(); if(!t)return ['']; const h=t.match(/^(#{1,3})\s+(.*)$/); if(h) return [h[2]]; const b=t.match(/^[-*]\s+(.*)$/); if(b) return [`• ${b[1]}`]; const n=t.match(/^\d+\.\s+(.*)$/); if(n) return [n[1]]; if(t.startsWith('|')) return [t.replace(/\|/g,' ').trim()]; return [t];});}
+export async function exportReportSectionsToDocx(input: ReportDocxExportInput): Promise<Buffer> { const title=input.documentTitle?.trim()||'Engineering Report Sections'; const gen=input.generatedAt??new Date().toISOString(); const lines=[title,`Project: ${input.projectName}`,`Generated: ${new Date(gen).toISOString()}`,...(input.generatedBy?[`Generated by: ${input.generatedBy}`]:[])]; for(const s of input.selectedSections){ lines.push('',s.title,...markdownLines(s.bodyMarkdown)); if(input.includeSourceReferences&&s.sourceReferences.length){ lines.push('Source References',...s.sourceReferences.flatMap((sr)=>[`Document: ${sr.documentId}${sr.pageNumber?`, Page: ${sr.pageNumber}`:''}${sr.sectionTitle?`, Section: ${sr.sectionTitle}`:''}`,...(sr.sourceText?[`Excerpt: ${sr.sourceText}`]:[])])); } } const paragraphXml=lines.map((line)=>`<w:p><w:r><w:t xml:space="preserve">${escapeXml(line)}</w:t></w:r></w:p>`).join(''); const documentXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paragraphXml}<w:sectPr/></w:body></w:document>`; const payload={documentXml}; const py=`import io, json, zipfile, sys\np=json.loads(sys.stdin.read())\nout=io.BytesIO()\nwith zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED) as z:\n z.writestr('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>')\n z.writestr('_rels/.rels','<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>')\n z.writestr('word/document.xml',p['documentXml'])\nsys.stdout.buffer.write(out.getvalue())`; const result=spawnSync('python3',['-c',py],{input:JSON.stringify(payload),maxBuffer:10_000_000}); if(result.status!==0) throw new Error('Failed to generate DOCX'); return Buffer.from(result.stdout); }
+// existing functions
+function normalizeValue(value: EngineeringValue['value']): string { return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' ? String(value) : JSON.stringify(value); }
+function uniqueStrings(values: string[]): string[] { return Array.from(new Set(values.filter((value) => value.trim()))); }
+function mergeSourceReferences(input: ReportGenerationInput, filteredValues: EngineeringValue[]): SourceReference[] { return [...(input.sourceReferences ?? []), ...filteredValues.flatMap((value) => value.sourceReferences)]; }
+export function generateReportSection(input: ReportGenerationInput): ReportSection { const now = new Date().toISOString(); const includedStatuses = input.includedStatuses ?? DEFAULT_INCLUDED_STATUSES; const filteredValues = input.engineeringValues.filter((value) => { if (value.projectId !== input.projectId) return false; if (input.componentId && value.componentId !== input.componentId) return false; return includedStatuses.includes(value.status); }); const sourceReferences = mergeSourceReferences(input, filteredValues); const sectionTemplates: Record<ReportSectionType, { title: string; body: () => string }> = { component_summary: { title: 'Component Summary', body: () => ['## Included Engineering Values', ...filteredValues.map((value) => `- **${value.label}** (${value.key}): ${normalizeValue(value.value)}${value.unit ? ` ${value.unit}` : ''} _[${value.status}]_`), filteredValues.length === 0 ? '- No approved or user-entered values available.' : ''].filter(Boolean).join('\n') }, calculation_summary: { title: 'Calculation Summary', body: () => { const results = (input.calculationResults ?? []).filter((result) => result.projectId === input.projectId); if (results.length === 0) return '## Calculation Outputs\n- No deterministic calculation results available.'; return ['## Calculation Outputs', ...results.map((result) => [`### ${result.moduleId}`, ...result.outputs.map((output) => `- **${output.label}**: ${String(output.value)}${output.unit ? ` ${output.unit}` : ''}`)].join('\n'))].join('\n'); } }, assumptions_and_warnings: { title: 'Assumptions and Warnings', body: () => { const assumptions = uniqueStrings([...(input.assumptions ?? []), ...((input.calculationResults ?? []).flatMap((result) => result.assumptions))]); const warnings = uniqueStrings([...(input.warnings ?? []), ...((input.calculationResults ?? []).flatMap((result) => result.warnings))]); return ['## Assumptions', ...(assumptions.length > 0 ? assumptions.map((item) => `- ${item}`) : ['- None provided.']), '', '## Warnings', ...(warnings.length > 0 ? warnings.map((item) => `- ${item}`) : ['- None provided.'])].join('\n'); } }, missing_information: { title: 'Missing Information', body: () => { const missing = uniqueStrings(input.missingInformation ?? []); return ['## Missing Information', ...(missing.length > 0 ? missing.map((item) => `- ${item}`) : ['- No missing information reported.'])].join('\n'); } }, source_references: { title: 'Source References', body: () => { if (sourceReferences.length === 0) return '## Source References\n- No source references available.'; return ['## Source References', ...sourceReferences.map((source) => `- Document: ${source.documentId}${source.pageNumber ? `, Page: ${source.pageNumber}` : ''}${source.sectionTitle ? `, Section: ${source.sectionTitle}` : ''}${source.sourceText ? `\n  - Excerpt: ${source.sourceText}` : ''}`)].join('\n'); } } }; const sectionTemplate = sectionTemplates[input.sectionType]; return { id: `rep-${Date.now()}-${Math.random().toString(16).slice(2)}`, projectId: input.projectId, title: sectionTemplate.title, bodyMarkdown: sectionTemplate.body(), sourceReferences, status: 'needs_review', createdAt: now, updatedAt: now }; }

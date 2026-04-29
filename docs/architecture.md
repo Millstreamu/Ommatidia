@@ -55,3 +55,7 @@ Extraction uses typed normalized errors with codes, retryable flags, safe detail
 ## Report section generation
 
 The system now supports deterministic, template-based report section generation in `packages/reports` and API/UI integration for editable markdown draft sections. Generated sections use approved and user-entered values by default, include assumptions/warnings/missing information/source references when provided, and explicitly avoid treating unreviewed AI-extracted values as final.
+
+## Word export
+
+Report sections can now be exported deterministically as `.docx` files via the API endpoint `POST /report-sections/export-docx`. Export generation lives in `packages/reports` and supports ordered section selection, optional source-reference inclusion, and deterministic markdown subset rendering (headings, paragraphs, bullets, numbered lists, and simple pipe tables).

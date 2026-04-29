@@ -1,24 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateReportSection } from '../dist/index.js';
-
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { exportReportSectionsToDocx, generateReportSection } from '../dist/index.js';
 const baseValue = { id:'v1', projectId:'p1', key:'flow', label:'Flow', value:100, valueType:'number', unit:'L/min', sourceReferences:[{documentId:'d1',pageNumber:2}], status:'approved', createdAt:'2026-01-01', updatedAt:'2026-01-01' };
-
-test('report generator includes approved values', () => {
-  const section = generateReportSection({ projectId:'p1', sectionType:'component_summary', engineeringValues:[baseValue] });
-  assert.match(section.bodyMarkdown, /Flow/);
-});
-
-test('report generator includes user_entered values and excludes unreviewed by default', () => {
-  const section = generateReportSection({ projectId:'p1', sectionType:'component_summary', engineeringValues:[baseValue, {...baseValue,id:'v2',status:'user_entered',label:'Pressure'}, {...baseValue,id:'v3',status:'ai_extracted',label:'AI'}, {...baseValue,id:'v4',status:'needs_review',label:'Review'}] });
-  assert.match(section.bodyMarkdown, /Pressure/);
-  assert.doesNotMatch(section.bodyMarkdown, /AI/);
-  assert.doesNotMatch(section.bodyMarkdown, /Review/);
-});
-
-test('report generator includes assumptions warnings and source references', () => {
-  const section = generateReportSection({ projectId:'p1', sectionType:'assumptions_and_warnings', engineeringValues:[baseValue], assumptions:['Ambient at 25C'], warnings:['Efficiency estimated'], sourceReferences:[{documentId:'d2'}] });
-  assert.match(section.bodyMarkdown, /Ambient/);
-  assert.match(section.bodyMarkdown, /Efficiency/);
-  assert.equal(section.sourceReferences.length, 2);
-});
+async function readDocXml(buffer){ const dir=await mkdtemp(path.join(tmpdir(),'docx-')); const file=path.join(dir,'out.docx'); await writeFile(file,buffer); const xml=execFileSync('python3',['-c',"import zipfile,sys;print(zipfile.ZipFile(sys.argv[1]).read('word/document.xml').decode())",file],{encoding:'utf8'}); await rm(dir,{recursive:true,force:true}); return xml; }
+// existing tests...
+test('report generator includes approved values', () => { const section = generateReportSection({ projectId:'p1', sectionType:'component_summary', engineeringValues:[baseValue] }); assert.match(section.bodyMarkdown, /Flow/); });
+test('report generator includes user_entered values and excludes unreviewed by default', () => { const section = generateReportSection({ projectId:'p1', sectionType:'component_summary', engineeringValues:[baseValue, {...baseValue,id:'v2',status:'user_entered',label:'Pressure'}, {...baseValue,id:'v3',status:'ai_extracted',label:'AI'}, {...baseValue,id:'v4',status:'needs_review',label:'Review'}] }); assert.match(section.bodyMarkdown, /Pressure/); assert.doesNotMatch(section.bodyMarkdown, /AI/); assert.doesNotMatch(section.bodyMarkdown, /Review/); });
+test('report generator includes assumptions warnings and source references', () => { const section = generateReportSection({ projectId:'p1', sectionType:'assumptions_and_warnings', engineeringValues:[baseValue], assumptions:['Ambient at 25C'], warnings:['Efficiency estimated'], sourceReferences:[{documentId:'d2'}] }); assert.match(section.bodyMarkdown, /Ambient/); assert.match(section.bodyMarkdown, /Efficiency/); assert.equal(section.sourceReferences.length, 2); });
+test('docx export generates non-empty buffer and includes project + titles in selected order', async () => { const sections=[{id:'s2',projectId:'p1',title:'Second',bodyMarkdown:'Paragraph',sourceReferences:[],status:'approved',createdAt:'2026',updatedAt:'2026'},{id:'s1',projectId:'p1',title:'First',bodyMarkdown:'1. One',sourceReferences:[],status:'approved',createdAt:'2026',updatedAt:'2026'}]; const buffer=await exportReportSectionsToDocx({projectId:'p1',projectName:'Project Alpha',selectedSections:sections,documentTitle:'Alpha Report'}); assert.ok(buffer.length>0); const xml=await readDocXml(buffer); assert.match(xml,/Project Alpha/); assert.ok(xml.indexOf('Second')<xml.indexOf('First')); });
+test('docx export includes source references when enabled', async () => { const buffer=await exportReportSectionsToDocx({projectId:'p1',projectName:'Project Alpha',includeSourceReferences:true,selectedSections:[{id:'s1',projectId:'p1',title:'With Sources',bodyMarkdown:'Body',sourceReferences:[{documentId:'doc-1',pageNumber:3}],status:'approved',createdAt:'2026',updatedAt:'2026'}]}); const xml=await readDocXml(buffer); assert.match(xml,/Source References/); assert.match(xml,/doc-1/); });

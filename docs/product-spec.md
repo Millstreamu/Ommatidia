@@ -27,3 +27,7 @@ Build an engineering design assistant that helps engineers move from source arti
 ## Editable report sections
 
 Project detail pages include a Report Sections area where users can generate deterministic markdown sections (Component Summary, Calculation Summary, Assumptions and Warnings, Missing Information, Source References), edit title/body, and save draft content through the API.
+
+## Word export for report sections
+
+Users can export saved report sections to a Microsoft Word `.docx` document from the Report Sections area. The export includes report title, project name, generated timestamp, selected sections in user-specified order, and optional source references.
