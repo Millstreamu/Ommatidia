@@ -8,6 +8,18 @@ export function validateEngineeringValueForm(input: Record<string, string>): str
 export function renderDocumentList(documents: Array<{ originalFilename: string; documentType: string; fileSizeBytes: number; uploadStatus: string; processingStatus: string; createdAt: string; id: string }>, apiBaseUrl: string): string {
   return documents.map((d) => `<li>${d.originalFilename} | ${d.documentType} | ${d.fileSizeBytes} bytes | ${d.uploadStatus}/${d.processingStatus} | ${new Date(d.createdAt).toISOString()} | <a href="${apiBaseUrl}/documents/${d.id}/file" target="_blank" rel="noreferrer">View</a></li>`).join('');
 }
+export async function triggerReportSectionsDocxExport(client: ApiClient, input: { projectId: string; reportSectionIds: string[]; documentTitle?: string; includeSourceReferences?: boolean }): Promise<string> {
+  const blob = await client.exportReportSectionsDocx(input);
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `${(input.documentTitle || 'report-sections').replace(/\s+/g, '-')}.docx`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+  return url;
+}
 
 export async function renderProjectList(client: ApiClient): Promise<string> {
   const projects = await client.listProjects();
@@ -72,6 +84,7 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
           <button>Generate section</button>
         </form>
         <div>${reportSections.map((section) => `<article><input data-report-title-id="${section.id}" value="${section.title}"/><textarea data-report-body-id="${section.id}" rows="8" cols="80">${section.bodyMarkdown}</textarea><button data-report-save-id="${section.id}">Save section</button></article>`).join('')}</div>
+        <button id="export-report-docx">Export Word document</button><span id="export-report-status"></span>
 
         <h3>Hydraulic Power</h3>
         <form id="calc-form"><input name="flowLpm" placeholder="flowLpm" required/><input name="pressureBar" placeholder="pressureBar" required/><input name="efficiency" placeholder="efficiency" required/><button>Run</button></form>
@@ -149,6 +162,16 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
           await load();
         };
       });
+      (view.querySelector('#export-report-docx') as HTMLButtonElement).onclick = async () => {
+        const statusEl = view.querySelector('#export-report-status') as HTMLElement;
+        statusEl.textContent = 'Exporting...';
+        try {
+          await triggerReportSectionsDocxExport(client, { projectId, reportSectionIds: reportSections.map((section) => section.id), documentTitle: `${project.name} Report Sections`, includeSourceReferences: true });
+          statusEl.textContent = 'Download started.';
+        } catch (error) {
+          statusEl.textContent = `Export failed: ${(error as Error).message}`;
+        }
+      };
 
       (view.querySelector('#calc-form') as HTMLFormElement).onsubmit = async (e) => {
         e.preventDefault();

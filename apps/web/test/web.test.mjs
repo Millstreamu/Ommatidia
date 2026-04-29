@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEngineeringValueForm, renderDocumentList } from '../dist/app.js';
+import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport } from '../dist/app.js';
 
 test('engineering value form validates required fields', () => {
   const errors = validateEngineeringValueForm({ key: '', label: '', value: '', valueType: '' });
@@ -24,4 +24,12 @@ test('report sections render from mocked api data', () => {
 test('report section edited text can be represented for save', () => {
   const payload = { title: 'Updated', bodyMarkdown: 'Edited body', status: 'needs_review' };
   assert.equal(payload.bodyMarkdown, 'Edited body');
+});
+
+test('export button helper calls API and handles file response', async () => {
+  global.document = { createElement: () => ({ clickCalled: false, click() { this.clickCalled = true; }, remove() {}, href: '', download: '' }), body: { appendChild() {} } };
+  global.URL = { createObjectURL: () => 'blob:mock', revokeObjectURL: () => {} };
+  const client = { exportReportSectionsDocx: async () => new Blob(['docx']) };
+  const url = await triggerReportSectionsDocxExport(client, { projectId: 'p1', reportSectionIds: ['s1'] });
+  assert.equal(url, 'blob:mock');
 });

@@ -101,3 +101,5 @@ EXTRACTION_PROVIDER=mock npm run start --workspace @ommatidia/api
 - `rate_limited`/`provider_unavailable`: retry later; retries are automatic up to `EXTRACTION_MAX_RETRIES`.
 - `invalid_json_response` / `invalid_model_response`: provider output was malformed and is intentionally rejected/safeguarded.
 - `file_not_found` / `unsupported_file_type`: re-upload a supported document.
+
+- Word report export is generated deterministically in `@ommatidia/reports` and returned as `.docx` from the API.
