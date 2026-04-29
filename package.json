@@ -18,5 +18,8 @@
     "test": "npm run test --workspaces --if-present",
     "clean": "node scripts/dev-clean.mjs",
     "reset-local": "node scripts/dev-reset-local.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }

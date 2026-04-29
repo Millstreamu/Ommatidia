@@ -8,7 +8,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "echo 'No lint rules configured for @ommatidia/api yet.'",
     "test": "npm run build --workspace @ommatidia/shared && npm run build --workspace @ommatidia/calculations && npm run build --workspace @ommatidia/extraction && npm run build --workspace @ommatidia/reports && npm run build && node --test test/*.test.mjs",
-    "start": "node dist/src/index.js"
+    "start": "node dist/index.js"
   },
   "dependencies": {
     "@ommatidia/shared": "0.1.0",
