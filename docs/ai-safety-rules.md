@@ -39,3 +39,9 @@
 - Extraction diagnostics must include only safe metadata (provider, model, status code, retryability, safe message, user action).
 - Diagnostics/logs must never include API keys, Authorization headers, full raw provider payloads, or full document text.
 - `provider_unavailable` must be used only as a safe fallback when failures cannot be reliably classified.
+
+## Extraction candidate normalization safety rules (Task 16C)
+
+- Candidate normalization may fill system metadata (`id`, `projectId`, `documentId`, timestamps, default `status`, inferred `valueType`, normalized `sourceReferences`) before shared schema validation.
+- Normalization must not invent engineering facts or missing engineering values; it only reshapes candidate structure.
+- Invalid candidates must remain visible through safe dropped-candidate diagnostics and concise user-facing warnings.

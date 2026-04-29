@@ -8,7 +8,8 @@ export type ExtractionErrorCode =
 export interface ExtractionErrorResponse { errorCode: ExtractionErrorCode; message: string; retryable: boolean; userAction?: string; details?: Record<string, unknown>; timestamp: string; }
 export class ExtractionError extends Error { constructor(public readonly payload: ExtractionErrorResponse) { super(payload.message); } }
 export interface ExtractEngineeringValuesInput { projectId: string; documentId: string; document: Document; documentFilePath: string; extractionTarget?: { componentType?: string; moduleType?: string }; }
-export interface ExtractionDiagnostics { documentFilename: string; documentMimeType: string; contentRead: boolean; contentSentToModel: boolean; rawCandidateCount: number; invalidCandidateCount: number; skippedApprovedConflictCount: number; }
+export interface DroppedCandidateDiagnostic { candidateIdentifier?: string; reasonCode: 'missing_value' | 'invalid_value_type' | 'invalid_source_references' | 'schema_validation_failed'; validationIssuePaths: string[]; validationIssueMessages: string[]; missingRequiredFields: boolean; }
+export interface ExtractionDiagnostics { documentFilename: string; documentMimeType: string; contentRead: boolean; contentSentToModel: boolean; rawCandidateCount: number; invalidCandidateCount: number; skippedApprovedConflictCount: number; droppedCandidates?: DroppedCandidateDiagnostic[]; }
 export interface ExtractEngineeringValuesResult { candidateValues: EngineeringValue[]; missingInformation: string[]; warnings: string[]; providerMetadata?: { provider: 'mock' | 'openai'; model?: string }; diagnostics?: ExtractionDiagnostics; }
 export interface ExtractionService { extractEngineeringValues(input: ExtractEngineeringValuesInput): Promise<ExtractEngineeringValuesResult>; }
 export function normalizedExtractionError(errorCode: ExtractionErrorCode, message: string, retryable = false, options?: { userAction?: string; details?: Record<string, unknown> }): ExtractionErrorResponse { return { errorCode, message, retryable, userAction: options?.userAction, details: options?.details, timestamp: new Date().toISOString() }; }
@@ -67,6 +68,49 @@ function mapOpenAiError(error: unknown, model: string): ExtractionError {
   return toDiagnosticError('provider_unavailable', 'OpenAI extraction failed: provider unavailable.', true, { model, statusCode, errorType, safeProviderMessage, userAction: 'Retry shortly.' });
 }
 
+
+
+function safeCandidateIdentifier(candidate: Record<string, unknown>): string | undefined {
+  const label = typeof candidate.label === 'string' ? candidate.label.trim() : '';
+  const key = typeof candidate.key === 'string' ? candidate.key.trim() : '';
+  return label || key || undefined;
+}
+function toSafeKey(label: string): string {
+  const cleaned = label.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return cleaned || 'extracted_value';
+}
+function inferValueType(value: unknown): 'number'|'string'|'boolean'|'list'|'table' {
+  if (typeof value === 'number') return 'number';
+  if (typeof value === 'boolean') return 'boolean';
+  if (Array.isArray(value)) return value.every((item) => typeof item === 'object' && item !== null && !Array.isArray(item)) ? 'table' : 'list';
+  return 'string';
+}
+function normalizeCandidate(raw: Record<string, unknown>, input: ExtractEngineeringValuesInput, index: number, now: string): Record<string, unknown> {
+  const notes: string[] = [];
+  const candidate = { ...raw };
+  if (typeof candidate.id !== 'string' || !candidate.id.trim()) { candidate.id = `ai-${input.documentId}-${index}`; notes.push('id generated'); }
+  if (typeof candidate.projectId !== 'string' || !candidate.projectId.trim()) { candidate.projectId = input.projectId; notes.push('projectId set from extraction input'); }
+  if (typeof candidate.documentId !== 'string' || !candidate.documentId.trim()) { candidate.documentId = input.documentId; notes.push('documentId set from extraction input'); }
+  candidate.status = candidate.status === 'ai_extracted' ? 'ai_extracted' : 'needs_review';
+  if (typeof raw.status !== 'string') notes.push('status defaulted to needs_review');
+  if (typeof candidate.createdAt !== 'string' || !candidate.createdAt.trim()) { candidate.createdAt = now; notes.push('createdAt added'); }
+  if (typeof candidate.updatedAt !== 'string' || !candidate.updatedAt.trim()) { candidate.updatedAt = now; notes.push('updatedAt added'); }
+  if (!Array.isArray(candidate.sourceReferences)) { candidate.sourceReferences = []; notes.push('sourceReferences defaulted to empty array'); }
+  if ((typeof candidate.key !== 'string' || !candidate.key.trim()) && typeof candidate.label === 'string' && candidate.label.trim()) { candidate.key = toSafeKey(candidate.label); notes.push('key generated from label'); }
+  if (typeof candidate.valueType !== 'string' || !candidate.valueType.trim()) { candidate.valueType = inferValueType(candidate.value); notes.push(`valueType inferred as ${candidate.valueType}`); }
+  if (notes.length) {
+    const existing = typeof candidate.notes === 'string' && candidate.notes.trim() ? `${candidate.notes} | ` : '';
+    candidate.notes = `${existing}Normalization: ${notes.join('; ')}`;
+  }
+  return candidate;
+}
+function formatDroppedWarnings(dropped: DroppedCandidateDiagnostic[]): string[] {
+  const grouped = new Map<string, number>();
+  for (const item of dropped) grouped.set(item.reasonCode, (grouped.get(item.reasonCode) ?? 0) + 1);
+  const map: Record<string,string> = { missing_value: 'missing value field', invalid_value_type: 'invalid valueType', invalid_source_references: 'sourceReferences was not an array', schema_validation_failed: 'failed schema validation' };
+  return Array.from(grouped.entries()).map(([code, count]) => `Dropped ${count} candidate${count===1?'':'s'}: ${map[code] ?? code}.`);
+}
+
 export class MockExtractionService implements ExtractionService {
   async extractEngineeringValues(input: ExtractEngineeringValuesInput): Promise<ExtractEngineeringValuesResult> {
     const now = new Date().toISOString();
@@ -121,7 +165,7 @@ export class OpenAiExtractionService implements ExtractionService {
     if (!SUPPORTED_MIME.has(input.document.mimeType)) throw new ExtractionError(normalizedExtractionError('unsupported_file_type', 'Unsupported file type for OpenAI extraction.', false));
     const encodedDocument = (input.documentFilePath ?? '').trim();
     if (!encodedDocument) throw new ExtractionError(normalizedExtractionError('no_document_content', 'No document content was sent to the model.', false, { details: { model: this.model, documentContentIncluded: false, usedFileInput: false } }));
-    const prompt = `Extract engineering candidate values from this document. Return strict JSON with keys candidateValues (array), missingInformation (array of strings), warnings (array of strings). Include common fields when present: manufacturer, model, part_number, component_type, rated_flow, max_flow, rated_pressure, max_pressure, displacement, speed_rpm, power, voltage, current, dimensions, weight, port_size, mounting, temperature_limits, efficiency, price, lead_time, notes. Preserve units from source. Do not invent missing values. Use statuses needs_review or ai_extracted only. Include sourceReferences only when supported by evidence.`;
+    const prompt = `Extract engineering candidate values from this document. Return strict JSON with keys candidateValues (array), missingInformation (array of strings), warnings (array of strings). For each candidate value include simple fields only: key, label, value, valueType, unit, confidence, notes, sourceReferences. valueType should be one of: number, string, boolean, list, table. sourceReferences must be an array when present. Do not include system metadata fields like id, projectId, documentId, createdAt, updatedAt; the application will add those. Preserve units from source. Do not invent missing values. Use statuses needs_review or ai_extracted only if you include status.`;
     let parsed: { candidateValues: Array<Record<string, unknown>>; missingInformation: string[]; warnings: string[] };
     try {
       const response = await this.client.responses.create({ model: this.model, input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }, { type: 'input_text', text: `Document server path: ${encodedDocument}` }] }], text: { format: { type: 'json_object' } } });
@@ -138,15 +182,16 @@ export class OpenAiExtractionService implements ExtractionService {
     if (typeof parsed !== 'object' || parsed === null) throw toDiagnosticError('unsupported_response_shape', 'Model returned an unsupported response shape.', false, { model: this.model, userAction: 'Retry extraction; if it repeats, adjust extraction configuration.' });
     if (!Array.isArray(parsed.candidateValues) || !Array.isArray(parsed.missingInformation) || !Array.isArray(parsed.warnings)) throw toDiagnosticError('schema_invalid_response', 'Model response failed schema checks.', false, { model: this.model, userAction: 'Retry extraction; if it repeats, adjust extraction configuration.' });
 
-    const now = new Date().toISOString(); const candidateValues: EngineeringValue[] = []; let invalidCandidateCount = 0;
+    const now = new Date().toISOString(); const candidateValues: EngineeringValue[] = []; let invalidCandidateCount = 0; const droppedCandidates: DroppedCandidateDiagnostic[] = [];
     for (let index = 0; index < parsed.candidateValues.length; index += 1) {
       const v = parsed.candidateValues[index];
-      try { candidateValues.push(engineeringValueSchema.parse({ ...v, id: String(v.id ?? `ai-${input.documentId}-${index}`), projectId: input.projectId, documentId: input.documentId, status: v.status === 'ai_extracted' ? 'ai_extracted' : 'needs_review', sourceReferences: Array.isArray(v.sourceReferences) ? v.sourceReferences : [], createdAt: String(v.createdAt ?? now), updatedAt: String(v.updatedAt ?? now) })); } catch { invalidCandidateCount += 1; }
+      const normalized = normalizeCandidate(v, input, index, now);
+      try { candidateValues.push(engineeringValueSchema.parse(normalized)); } catch (error) { invalidCandidateCount += 1; const candidateIdentifier = safeCandidateIdentifier(normalized); const issues = error instanceof Error && 'issues' in error ? ((error as any).issues as Array<{ path?: Array<string|number>; message?: string }>) : []; const paths = issues.map((i) => Array.isArray(i.path) ? i.path.join('.') : '').filter(Boolean); const messages = issues.map((i) => i.message ?? '').filter(Boolean); const missingValue = normalized.value === undefined || normalized.value === null || (typeof normalized.value === 'string' && normalized.value.trim() === ''); const invalidValueType = messages.some((m) => m.toLowerCase().includes('valuetype')); const invalidSourceRefs = !Array.isArray(v.sourceReferences); droppedCandidates.push({ candidateIdentifier, reasonCode: missingValue ? 'missing_value' : invalidValueType ? 'invalid_value_type' : invalidSourceRefs ? 'invalid_source_references' : 'schema_validation_failed', validationIssuePaths: paths, validationIssueMessages: messages, missingRequiredFields: messages.some((m) => m.toLowerCase().includes('required')) || missingValue }); }
     }
     const warnings = [...parsed.warnings];
     if (candidateValues.length === 0) warnings.push('No engineering values were extracted from this document.');
-    if (invalidCandidateCount > 0) warnings.push(`Dropped ${invalidCandidateCount} candidate value(s) that failed schema validation.`);
-    return { candidateValues, missingInformation: parsed.missingInformation, warnings, providerMetadata: { provider: 'openai', model: this.model }, diagnostics: { documentFilename: input.document.originalFilename, documentMimeType: input.document.mimeType, contentRead: true, contentSentToModel: true, rawCandidateCount: parsed.candidateValues.length, invalidCandidateCount, skippedApprovedConflictCount: 0 } };
+    if (invalidCandidateCount > 0) warnings.push(...formatDroppedWarnings(droppedCandidates));
+    return { candidateValues, missingInformation: parsed.missingInformation, warnings, providerMetadata: { provider: 'openai', model: this.model }, diagnostics: { documentFilename: input.document.originalFilename, documentMimeType: input.document.mimeType, contentRead: true, contentSentToModel: true, rawCandidateCount: parsed.candidateValues.length, invalidCandidateCount, skippedApprovedConflictCount: 0, droppedCandidates } };
   }
 }
 
