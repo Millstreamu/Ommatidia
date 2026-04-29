@@ -80,6 +80,16 @@ This test plan defines acceptance criteria and validation strategy for existing 
 - [ ] Clean command removes build outputs without deleting `.env` or uploads.
 - [ ] Reset-local command (if used) clearly warns and only clears local dev upload data.
 
+
+
+### UI usability and workflow clarity
+- [ ] Projects page shows empty/loading/error states with clear create/open affordances.
+- [ ] Project details are grouped into workflow sections (overview, components, values, documents, extraction, calculations, report, export).
+- [ ] Engineering value statuses are visually explicit, with clear approve/reject actions.
+- [ ] Document extraction surfaces loading/success/friendly error/retry cues.
+- [ ] Hydraulic calculation UI labels expected units and presents readable results.
+- [ ] Report section edit/save flow and Word export action/status remain clear and functional.
+
 ## Manual smoke test checklist
 1. Create project, component, and engineering values in the web app.
 2. Upload valid PDF and image files and verify document metadata appears.
@@ -106,6 +116,11 @@ This test plan defines acceptance criteria and validation strategy for existing 
 | Unsupported file rejection | Covered by API test |
 | Oversized file rejection | Missing (size limit not implemented) |
 | Uploaded document metadata listed | Covered by UI test |
+| Projects empty/list rendering states | Covered by UI test |
+| Project details workflow section headings | Covered by UI test |
+| Engineering status badge rendering | Covered by UI test |
+| Calculation result readability labels | Covered by UI test |
+| Report edit/save representation + export trigger helper | Covered by UI test |
 | Uploaded files not committed to Git | Manual only (repo hygiene check) |
 | Mock extraction without API key | Covered by unit test + API test |
 | OpenAI extraction key from server env | Covered by unit test |

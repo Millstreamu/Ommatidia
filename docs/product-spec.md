@@ -37,3 +37,13 @@ Users can export saved report sections to a Microsoft Word `.docx` document from
 - Promote project component data to reusable library entries from approved or user_entered values only.
 - Copy library components into projects without overwriting existing project values.
 - Compare a library component against a project component with matching/differing/missing/extra buckets.
+
+
+## User interface principles and primary workflows
+
+- The web UI prioritizes clarity for non-technical users with a stable header, simple navigation, and workflow-oriented sections.
+- Project details are grouped into predictable sections: Project overview, Components, Engineering values, Documents, AI extraction, Calculations, Report sections, and Word export.
+- Engineering values always display explicit status badges (`user_entered`, `approved`, `needs_review`, `ai_extracted`, `rejected`, `superseded`) and keep unapproved values visible for reviewer action.
+- AI extraction UX must show loading, success, normalized friendly errors, and retryability where supported.
+- Calculations stay deterministic and show formula name, units, assumptions, warnings, and result readability.
+- Report sections are clearly marked as editable drafts, with save and Word export feedback that reflects the current saved content.
