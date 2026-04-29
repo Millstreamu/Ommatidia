@@ -95,3 +95,11 @@ test('report safety workflow includes approved values and excludes needs_review 
   assert.match(generated.bodyMarkdown, /Pressure/);
   assert.doesNotMatch(generated.bodyMarkdown, /Draft Value/);
 }); });
+
+
+test('unknown API route returns not found', async () => { await withServer(async (base) => {
+  const res = await fetch(`${base}/does-not-exist`);
+  assert.equal(res.status, 404);
+  const body = await res.json();
+  assert.equal(body.error, 'Not found');
+}); });

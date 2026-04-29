@@ -1,6 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge } from '../dist/app.js';
+import { startWebApp } from '../dist/index.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+async function withWebServer(fn) {
+  const previousCwd = process.cwd();
+  const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  process.chdir(webRoot);
+  const server = startWebApp(0);
+  await new Promise((resolve) => server.once('listening', resolve));
+  const { port } = server.address();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  try { await fn(baseUrl); } finally { server.close(); process.chdir(previousCwd); }
+}
 
 test('engineering value form validates required fields', () => {
   const errors = validateEngineeringValueForm({ key: '', label: '', value: '', valueType: '' });
@@ -52,9 +66,24 @@ test('report section edited text can be represented for save', () => {
 });
 
 test('Word export button helper calls API and handles file response', async () => {
+  const originalDocument = global.document;
+  const originalURL = global.URL;
   global.document = { createElement: () => ({ clickCalled: false, click() { this.clickCalled = true; }, remove() {}, href: '', download: '' }), body: { appendChild() {} } };
   global.URL = { createObjectURL: () => 'blob:mock', revokeObjectURL: () => {} };
   const client = { exportReportSectionsDocx: async () => new Blob(['docx']) };
   const url = await triggerReportSectionsDocxExport(client, { projectId: 'p1', reportSectionIds: ['s1'] });
   assert.equal(url, 'blob:mock');
+  global.document = originalDocument;
+  global.URL = originalURL;
+});
+
+
+test('web root serves app shell with projects heading and API 3001 default', async () => {
+  await withWebServer(async (base) => {
+    const res = await fetch(base + '/');
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.match(html, /mountApp/);
+    assert.match(html, /127\.0\.0\.1:3001/);
+  });
 });

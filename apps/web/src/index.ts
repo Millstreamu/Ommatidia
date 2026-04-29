@@ -2,9 +2,9 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-const html = `<!doctype html><html><body><div id="app"></div><script type="module">import { mountApp } from '/app.js'; mountApp(document.getElementById('app'), window.__API_BASE_URL__ || 'http://127.0.0.1:3000');</script></body></html>`;
+const html = `<!doctype html><html><body><div id="app"></div><script type="module">import { mountApp } from '/app.js'; mountApp(document.getElementById('app'), window.__API_BASE_URL__ || 'http://127.0.0.1:3001');</script></body></html>`;
 
-export function startWebApp(port = 5173): ReturnType<typeof createServer> {
+export function startWebApp(port = 3000): ReturnType<typeof createServer> {
   const server = createServer(async (req, res) => {
     if ((req.url ?? '/') === '/app.js') {
       const appJs = await readFile(resolve(process.cwd(), 'dist/app.js'), 'utf-8');
