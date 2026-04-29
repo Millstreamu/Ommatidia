@@ -6,6 +6,7 @@ export interface EngineeringValue { id: string; projectId: string; componentId?:
 export interface EngineeringModule { id: string; name: string; description: string; moduleType: string; }
 export interface DocumentRecord { id: string; projectId: string; originalFilename: string; storedFilename: string; mimeType: string; fileSizeBytes: number; documentType: string; uploadStatus: string; processingStatus: string; createdAt: string; updatedAt: string; }
 export interface SystemStatus { ok: boolean; extractionProvider: 'openai' | 'mock' | 'unknown'; openAiConfigured: boolean; openAiModel?: string; apiProxyMode: boolean; timestamp: string; }
+export interface OpenAiSmokeTestResult { ok: boolean; provider: 'openai'; model: string; openAiConfigured: boolean; statusCode?: number; message: string; timestamp: string; }
 
 export interface HydraulicPowerResponse { moduleId: string; projectId: string; inputsUsed: Array<{ key: string; label: string; value: number | string | boolean; valueType: string; unit?: string }>; outputs: Array<{ key: string; label: string; value: number | string | boolean; valueType: string; unit?: string }>; warnings: string[]; assumptions: string[]; createdAt: string; }
 
@@ -24,6 +25,7 @@ export class ApiClient {
   listProjects() { return this.request<Project[]>('/projects'); }
   getSystemStatus() { return this.request<SystemStatus>('/system/status'); }
   updateExtractionProvider(extractionProvider: 'mock' | 'openai') { return this.request<SystemStatus>('/system/extraction-provider', { method: 'PATCH', body: JSON.stringify({ extractionProvider }) }); }
+  testOpenAi() { return this.request<OpenAiSmokeTestResult>('/system/openai-smoke-test'); }
   createProject(input: { name: string; description?: string; projectType: string }) { return this.request<Project>('/projects', { method: 'POST', body: JSON.stringify(input) }); }
   getProject(projectId: string) { return this.request<Project>(`/projects/${projectId}`); }
   listComponents(projectId: string) { return this.request<Component[]>(`/components?projectId=${projectId}`); }

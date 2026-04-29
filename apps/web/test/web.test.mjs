@@ -66,6 +66,8 @@ test('extraction provider controls render provider state and credit note', () =>
   const html = renderExtractionProviderControls({ ok: true, extractionProvider: 'openai', openAiConfigured: true, apiProxyMode: true, timestamp: new Date().toISOString() });
   assert.match(html, /Extraction: OpenAI/);
   assert.match(html, /Real OpenAI extraction may use API credits\./);
+  assert.match(html, /Test OpenAI/);
+  assert.match(html, /Small connectivity\/configuration test only/);
 });
 
 test('extraction provider controls disable OpenAI when key missing', () => {

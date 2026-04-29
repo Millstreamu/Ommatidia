@@ -3,6 +3,7 @@ import { engineeringValueSchema, type Document, type EngineeringValue } from '@o
 
 export type ExtractionErrorCode =
   | 'missing_api_key' | 'invalid_api_key' | 'permission_denied' | 'provider_unavailable' | 'request_timeout' | 'rate_limited' | 'model_not_found' | 'bad_request' | 'network_failure' | 'invalid_model_response' | 'invalid_json_response'
+  | 'schema_invalid_response' | 'unsupported_response_shape' | 'no_document_content'
   | 'file_not_found' | 'unsupported_file_type' | 'file_too_large' | 'extraction_failed' | 'unknown_error';
 export interface ExtractionErrorResponse { errorCode: ExtractionErrorCode; message: string; retryable: boolean; userAction?: string; details?: Record<string, unknown>; timestamp: string; }
 export class ExtractionError extends Error { constructor(public readonly payload: ExtractionErrorResponse) { super(payload.message); } }
@@ -74,7 +75,7 @@ export class MockExtractionService implements ExtractionService {
 }
 
 export class OpenAiExtractionService implements ExtractionService {
-  constructor(private readonly client: { responses: { create: (input: unknown) => Promise<{ output_text?: string }> } }, private readonly model = DEFAULT_OPENAI_MODEL) {}
+  constructor(private readonly client: { responses: { create: (input: unknown) => Promise<Record<string, unknown>> } }, private readonly model = DEFAULT_OPENAI_MODEL) {}
   static resolveModelFromEnv(): string { return (process.env.OPENAI_EXTRACTION_MODEL ?? DEFAULT_OPENAI_MODEL).trim() || DEFAULT_OPENAI_MODEL; }
   static fromEnv(): OpenAiExtractionService {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -91,27 +92,51 @@ export class OpenAiExtractionService implements ExtractionService {
         err.error = responseJson?.error;
         throw err;
       }
-      return responseJson as { output_text?: string };
+      return (responseJson ?? {}) as Record<string, unknown>;
     } } };
     return new OpenAiExtractionService(client, model);
+  }
+
+  private getResponseText(response: Record<string, unknown>): string | undefined {
+    const outputText = response.output_text;
+    if (typeof outputText === 'string' && outputText.trim()) return outputText;
+    const output = Array.isArray(response.output) ? response.output : [];
+    const chunks: string[] = [];
+    for (const item of output) {
+      const content = Array.isArray((item as { content?: unknown[] }).content) ? (item as { content?: unknown[] }).content! : [];
+      for (const block of content) {
+        const text = (block as { text?: string }).text;
+        if (typeof text === 'string' && text.trim()) chunks.push(text);
+      }
+    }
+    return chunks.length ? chunks.join('\n') : undefined;
+  }
+  private buildSafeDiagnostics(response: Record<string, unknown>, documentContentIncluded: boolean, usedFileInput: boolean): Record<string, unknown> {
+    const output = Array.isArray(response.output) ? response.output : [];
+    const outputItemTypes = output.map((item) => (item as { type?: unknown }).type).filter((v) => typeof v === 'string');
+    return { model: this.model, responseId: typeof response.id === 'string' ? response.id : undefined, outputItemTypes, status: typeof response.status === 'string' ? response.status : undefined, finishReason: typeof response.finish_reason === 'string' ? response.finish_reason : undefined, documentContentIncluded, usedFileInput };
   }
 
   async extractEngineeringValues(input: ExtractEngineeringValuesInput): Promise<ExtractEngineeringValuesResult> {
     if (!SUPPORTED_MIME.has(input.document.mimeType)) throw new ExtractionError(normalizedExtractionError('unsupported_file_type', 'Unsupported file type for OpenAI extraction.', false));
     const encodedDocument = (input.documentFilePath ?? '').trim();
-    if (!encodedDocument) throw new ExtractionError(normalizedExtractionError('file_not_found', 'Document file is missing or unreadable.', false));
+    if (!encodedDocument) throw new ExtractionError(normalizedExtractionError('no_document_content', 'No document content was sent to the model.', false, { details: { model: this.model, documentContentIncluded: false, usedFileInput: false } }));
     const prompt = `Extract engineering candidate values from this document. Return strict JSON with keys candidateValues (array), missingInformation (array of strings), warnings (array of strings). Include common fields when present: manufacturer, model, part_number, component_type, rated_flow, max_flow, rated_pressure, max_pressure, displacement, speed_rpm, power, voltage, current, dimensions, weight, port_size, mounting, temperature_limits, efficiency, price, lead_time, notes. Preserve units from source. Do not invent missing values. Use statuses needs_review or ai_extracted only. Include sourceReferences only when supported by evidence.`;
     let parsed: { candidateValues: Array<Record<string, unknown>>; missingInformation: string[]; warnings: string[] };
     try {
       const response = await this.client.responses.create({ model: this.model, input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }, { type: 'input_text', text: `Document server path: ${encodedDocument}` }] }], text: { format: { type: 'json_object' } } });
-      if (!response.output_text) throw toDiagnosticError('invalid_model_response', 'Model returned empty output.', false, { model: this.model, userAction: 'Retry extraction or adjust prompt/model configuration.' });
-      parsed = JSON.parse(response.output_text) as typeof parsed;
+      const responseText = this.getResponseText(response);
+      if (!responseText) {
+        throw new ExtractionError(normalizedExtractionError('invalid_model_response', 'Model returned empty output.', false, { userAction: 'Retry extraction or adjust prompt/model configuration.', details: this.buildSafeDiagnostics(response, true, false) }));
+      }
+      parsed = JSON.parse(responseText) as typeof parsed;
     } catch (error) {
       if (error instanceof ExtractionError) throw error;
       if (error instanceof SyntaxError) throw toDiagnosticError('invalid_json_response', 'Model returned invalid JSON.', false, { model: this.model, userAction: 'Retry extraction; if it repeats, switch model or provider.' });
       throw mapOpenAiError(error, this.model);
     }
-    if (!Array.isArray(parsed.candidateValues) || !Array.isArray(parsed.missingInformation) || !Array.isArray(parsed.warnings)) throw toDiagnosticError('invalid_model_response', 'Model response failed schema checks.', false, { model: this.model, userAction: 'Retry extraction; if it repeats, adjust extraction configuration.' });
+    if (typeof parsed !== 'object' || parsed === null) throw toDiagnosticError('unsupported_response_shape', 'Model returned an unsupported response shape.', false, { model: this.model, userAction: 'Retry extraction; if it repeats, adjust extraction configuration.' });
+    if (!Array.isArray(parsed.candidateValues) || !Array.isArray(parsed.missingInformation) || !Array.isArray(parsed.warnings)) throw toDiagnosticError('schema_invalid_response', 'Model response failed schema checks.', false, { model: this.model, userAction: 'Retry extraction; if it repeats, adjust extraction configuration.' });
 
     const now = new Date().toISOString(); const candidateValues: EngineeringValue[] = []; let invalidCandidateCount = 0;
     for (let index = 0; index < parsed.candidateValues.length; index += 1) {
@@ -128,3 +153,18 @@ export class OpenAiExtractionService implements ExtractionService {
 export class RetryingExtractionService implements ExtractionService { constructor(private readonly inner: ExtractionService, private readonly timeoutMs = Number(process.env.EXTRACTION_TIMEOUT_MS ?? 15000), private readonly maxRetries = Number(process.env.EXTRACTION_MAX_RETRIES ?? 2)) {} async extractEngineeringValues(input: ExtractEngineeringValuesInput): Promise<ExtractEngineeringValuesResult> { let attempt = 0; while (true) { try { return await withTimeout(this.inner.extractEngineeringValues(input), this.timeoutMs); } catch (error) { const e = error instanceof ExtractionError ? error : new ExtractionError(normalizedExtractionError('unknown_error', 'Unknown extraction error', false)); if (RETRYABLE.has(e.payload.errorCode) && attempt < this.maxRetries) { attempt += 1; await sleep(150 * attempt); continue; } throw e; } } } }
 export function createExtractionService(mode = process.env.EXTRACTION_PROVIDER ?? 'mock'): ExtractionService { const base = mode === 'openai' ? OpenAiExtractionService.fromEnv() : new MockExtractionService(); return new RetryingExtractionService(base); }
 export function getDefaultOpenAiExtractionModel(): string { return OpenAiExtractionService.resolveModelFromEnv(); }
+export async function runOpenAiSmokeTest(): Promise<{ ok: boolean; provider: 'openai'; model: string; openAiConfigured: boolean; statusCode?: number; message: string; timestamp: string }> {
+  const model = getDefaultOpenAiExtractionModel();
+  const configured = Boolean(process.env.OPENAI_API_KEY?.trim());
+  if (!configured) return { ok: false, provider: 'openai', model, openAiConfigured: false, message: 'OPENAI_API_KEY is not configured on the server.', timestamp: new Date().toISOString() };
+  try {
+    const service = OpenAiExtractionService.fromEnv();
+    const response = await (service as any).client.responses.create({ model, input: [{ role: 'user', content: [{ type: 'input_text', text: 'Return exactly this JSON: {\"ok\":true}' }] }], text: { format: { type: 'json_object' } } });
+    const text = (service as any).getResponseText(response);
+    if (!text) return { ok: false, provider: 'openai', model, openAiConfigured: true, message: 'OpenAI responded but no output text was returned.', timestamp: new Date().toISOString() };
+    return { ok: true, provider: 'openai', model, openAiConfigured: true, message: 'OpenAI test succeeded.', timestamp: new Date().toISOString() };
+  } catch (error) {
+    const mapped = mapOpenAiError(error, model).payload;
+    return { ok: false, provider: 'openai', model, openAiConfigured: true, statusCode: typeof mapped.details?.statusCode === 'number' ? mapped.details.statusCode as number : undefined, message: mapped.message, timestamp: new Date().toISOString() };
+  }
+}

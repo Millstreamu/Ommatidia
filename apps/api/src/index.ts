@@ -5,7 +5,7 @@ import { createReadStream } from 'node:fs';
 import path from 'node:path';
 import { ZodError, z } from 'zod';
 import { dataStatusSchema, documentProcessingStatusSchema, documentTypeSchema, reportSectionSchema, type CalculationResult, type Component, type DataStatus, type Document, type EngineeringModule, type EngineeringValue, type Project, type ReportSection, type SourceReference, type ComponentLibraryItem, componentLibraryItemSchema, sourceReferenceSchema } from '@ommatidia/shared';
-import { createExtractionService, getDefaultOpenAiExtractionModel, type ExtractionErrorCode, ExtractionError, normalizedExtractionError } from '@ommatidia/extraction';
+import { createExtractionService, getDefaultOpenAiExtractionModel, runOpenAiSmokeTest, type ExtractionErrorCode, ExtractionError, normalizedExtractionError } from '@ommatidia/extraction';
 import { hydraulicPowerKw, toSharedCalculationResult } from '@ommatidia/calculations';
 import { exportReportSectionsToDocx, generateReportSection, type ReportGenerationInput, type ReportSectionType } from '@ommatidia/reports';
 const UPLOAD_DIR = path.resolve(process.cwd(), 'storage/uploads'); const MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024; const ALLOWED_MIME_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/webp']);
@@ -43,7 +43,7 @@ function applyCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
   res.setHeader('vary', 'Origin');
 }
 function sendJson(req: IncomingMessage, res: ServerResponse, status: number, body: unknown): void { applyCorsHeaders(req, res); res.statusCode=status; res.setHeader('content-type','application/json'); res.end(JSON.stringify(body)); }
-const errorStatusMap: Record<ExtractionErrorCode, number> = { missing_api_key: 401, invalid_api_key: 401, permission_denied: 403, provider_unavailable: 503, request_timeout: 408, rate_limited: 429, model_not_found: 400, bad_request: 400, network_failure: 503, invalid_model_response: 400, invalid_json_response: 400, file_not_found: 404, unsupported_file_type: 400, file_too_large: 400, extraction_failed: 500, unknown_error: 500 };
+const errorStatusMap: Record<ExtractionErrorCode, number> = { missing_api_key: 401, invalid_api_key: 401, permission_denied: 403, provider_unavailable: 503, request_timeout: 408, rate_limited: 429, model_not_found: 400, bad_request: 400, network_failure: 503, invalid_model_response: 400, invalid_json_response: 400, schema_invalid_response: 400, unsupported_response_shape: 400, no_document_content: 400, file_not_found: 404, unsupported_file_type: 400, file_too_large: 400, extraction_failed: 500, unknown_error: 500 };
 function resolveExtractionProvider(): 'openai' | 'mock' | 'unknown' { const provider = (process.env.EXTRACTION_PROVIDER ?? 'mock').trim().toLowerCase(); if (provider === 'openai' || provider === 'mock') return provider; return 'unknown'; }
 function isOpenAiConfigured(): boolean { return Boolean(process.env.OPENAI_API_KEY?.trim()); }
 function createSafeSystemStatus(extractionProvider: 'mock' | 'openai') { return { ok: true, extractionProvider, openAiConfigured: isOpenAiConfigured(), openAiModel: getDefaultOpenAiExtractionModel(), apiProxyMode: true, timestamp: new Date().toISOString() }; }
@@ -55,6 +55,7 @@ if(method==='OPTIONS'){ applyCorsHeaders(req, res); res.statusCode = 204; res.en
 if(method==='POST'&&pathname==='/projects') return sendJson(req, res,201,projects.create({...projectCreateSchema.parse(await readBody(req)),id:randomUUID(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}));
 if(method==='GET'&&pathname==='/projects') return sendJson(req, res,200,projects.list());
 if(method==='GET'&&pathname==='/system/status') return sendJson(req, res,200,createSafeSystemStatus(extractionProvider));
+if(method==='GET'&&pathname==='/system/openai-smoke-test'){ const result = await runOpenAiSmokeTest(); return sendJson(req,res,result.ok?200:502,result); }
 if(method==='PATCH'&&pathname==='/system/extraction-provider'){ const { extractionProvider: requestedProvider } = extractionProviderUpdateSchema.parse(await readBody(req)); if(requestedProvider==='openai'&&!isOpenAiConfigured()) return sendJson(req,res,400,{ message:'OpenAI API key is not configured on the server.' }); extractionProvider=requestedProvider; return sendJson(req,res,200,createSafeSystemStatus(extractionProvider)); }
 
 if(method==='GET'&&/^\/projects\/[^/]+$/.test(pathname)){ const id=pathname.split('/')[2]; const project=projects.getById(id); if(!project) return sendJson(req, res,404,{error:'Project not found'}); return sendJson(req, res,200,project); }

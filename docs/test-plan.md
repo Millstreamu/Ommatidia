@@ -198,3 +198,4 @@ Package-focused (optional):
 
 
 - [x] Task 16A: OpenAI extraction failures classify auth/permission/rate/timeout/model/bad-request/network errors and expose only safe diagnostics in API logs/UI.
+- [x] Task 16B: OpenAI smoke test endpoint + UI button + safe empty-output diagnostics/parsing distinctions (empty vs invalid JSON vs schema invalid vs unsupported shape vs no document content).
