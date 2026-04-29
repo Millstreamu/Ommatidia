@@ -51,6 +51,8 @@ This test plan defines acceptance criteria and validation strategy for existing 
 - [ ] Source-reference variants normalize safely without dropping valid candidates.
 - [ ] Extraction uses only selected document content per attempt (no stale payload reuse).
 - [ ] Image-only/no-text PDFs return clear OCR/vision warning and avoid unrelated guesses.
+- [ ] PDF internals/metadata-heavy extraction is detected and blocked from OpenAI payloads.
+- [ ] Extraction diagnostics include extracted/useful text character counts and model-call flag.
 
 ### Extraction provider switching
 - [ ] User can switch extraction provider between mock and OpenAI from header controls.
@@ -151,6 +153,8 @@ This test plan defines acceptance criteria and validation strategy for existing 
 | Source-reference variants normalize safely without dropping valid candidates | Covered by extraction unit test |
 | Extraction uses only selected document content per attempt (no stale payload reuse) | Covered by extraction unit test |
 | Image-only/no-text PDFs return OCR/vision-required warning and avoid unrelated guesses | Covered by extraction unit test |
+| PDF internals/metadata-heavy extraction blocked from OpenAI payloads | Covered by extraction unit test |
+| Extraction diagnostics include useful/extracted char counts and warning visibility in UI | Covered by extraction + UI tests |
 | missing_api_key error | Covered by unit test |
 | request_timeout error | Covered by unit test |
 | retryable rate limit/provider failure | Covered by extraction unit tests with provider stubs |
@@ -210,3 +214,4 @@ Package-focused (optional):
 
 
 - [x] Task 16C: Candidate normalization + safe dropped-candidate diagnostics + UI warning detail for extraction drops.
+- [x] Task 16E: PDF visible-text extraction diagnostics + internal-metadata detection + safe OpenAI gating + UI diagnostic summary.

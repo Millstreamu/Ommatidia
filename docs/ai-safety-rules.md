@@ -51,3 +51,9 @@
 - Source references may be normalized from legacy forms (`sourceReference`, string/object `sourceReferences`) into schema-safe `sourceReferences[]`.
 - Normalization must never invent engineering values; it may only reshape candidate metadata and retain/drop invalid reference items safely.
 - No-text/image-only documents must not produce unrelated guessed candidates; extraction must return a clear OCR/vision-required warning.
+
+## PDF text extraction evidence safety (Task 16E)
+
+- Extraction must not send PDF internals (font tables, encoding metadata, object/xref/trailer stream content) as if they were visible engineering evidence.
+- If PDF text diagnostics indicate mostly internal/metadata text, extraction must stop before OpenAI candidate extraction and return a clear warning that useful visible text was not produced.
+- When text extraction fails, AI must not invent engineering values and must explicitly recommend OCR/vision extraction.

@@ -58,12 +58,13 @@ test('normalizes sourceReferences string and drops only invalid items', async ()
   });
 });
 
-test('image-only/no-text pdf path returns OCR warning and no unrelated guesses', async () => {
+test('image-only/no-text pdf path returns useful-text warning and no model call', async () => {
   await withTempPdf('%PDF-1.4\x00\x01\x02\x03', async (pdfPath) => {
     const svc = new OpenAiExtractionService({ responses: { create: async () => { throw new Error('should not call model'); } } });
     const result = await svc.extractEngineeringValues({ projectId: 'p', documentId: 'd', document: doc, documentFilePath: pdfPath });
     assert.equal(result.candidateValues.length, 0);
-    assert.match(result.warnings.join(' | '), /No selectable text was found\. OCR or vision extraction is required for this document\./i);
+    assert.match(result.warnings.join(' | '), /PDF text extraction did not produce useful visible text/i);
+    assert.equal(result.diagnostics?.contentSentToModel, false);
   });
 });
 
