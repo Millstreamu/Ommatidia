@@ -50,6 +50,8 @@ Notes:
 - `reset-local` deletes local development uploads in `storage/uploads` and recreates the folder; it does not delete `.env`.
 - In GitHub Codespaces, `OPENAI_API_KEY` can be provided via Codespaces/repository secrets or environment variables.
 - The default extraction provider is `mock`, so real OpenAI credentials are not required for basic local startup.
+- If the web UI appears blank, open the browser developer console and check for JavaScript errors.
+- In GitHub Codespaces, use forwarded port `3000` for web and forwarded port `3001` for API; the web app automatically maps the forwarded `3000` hostname to `3001` for API calls.
 
 ## Repository layout
 
