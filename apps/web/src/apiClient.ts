@@ -25,4 +25,7 @@ export class ApiClient {
     return response.json() as Promise<DocumentRecord>;
   }
   hydraulicPowerKw(input: { projectId: string; flowLpm: number; pressureBar: number; efficiency: number }) { return this.request<HydraulicPowerResponse>('/calculations/hydraulic-power-kw', { method: 'POST', body: JSON.stringify(input) }); }
+  extractValues(input: { projectId: string; documentId: string; extractionTarget?: { componentType?: string; moduleType?: string } }) { return this.request<ExtractionResult>('/extractions', { method: 'POST', body: JSON.stringify(input) }); }
 }
+
+export interface ExtractionResult { candidateValues: EngineeringValue[]; missingInformation: string[]; warnings: string[]; providerMetadata?: { provider: string; model?: string } }

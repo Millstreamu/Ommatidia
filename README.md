@@ -73,3 +73,10 @@ Notes:
 ## Local document uploads
 
 API uploads are stored in `storage/uploads/` for local development only. The folder is gitignored and should be replaced by managed object storage in production. This task only stores raw files + metadata (no OCR/extraction yet).
+
+## AI extraction setup
+
+- Copy `.env.example` to `.env`.
+- Set `OPENAI_API_KEY` to use real OpenAI extraction.
+- By default, the API uses a deterministic mock extraction service for tests/local development.
+- AI extracted values are candidate data only and must be reviewed/approved before final use.

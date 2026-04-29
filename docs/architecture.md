@@ -36,3 +36,14 @@
 ## Document upload
 
 The API now supports local development uploads for PDF/image files to project-scoped document records. Files are written to `storage/uploads/` with generated unique stored filenames, while metadata is tracked in the document model and served through `/documents` endpoints. This implementation is intentionally local-only for development and should move to managed object storage later. No AI extraction, OCR, or content parsing is performed in this stage.
+
+## AI extraction pipeline
+
+The first extraction pipeline is synchronous and runs inside `apps/api`:
+1. Client calls `POST /extractions` with `projectId` and `documentId`.
+2. API loads document metadata and verifies the uploaded file exists.
+3. API invokes an `ExtractionService` (`mock` by default, `openai` when configured).
+4. Candidate `EngineeringValue` records are stored with `needs_review`/`ai_extracted` status only.
+5. Approved values are never overwritten by extraction writes.
+
+No background jobs, OCR pipeline, or report generation side effects are included in this phase.
