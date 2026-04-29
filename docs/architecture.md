@@ -51,3 +51,7 @@ No background jobs, OCR pipeline, or report generation side effects are included
 ## Extraction error handling
 
 Extraction uses typed normalized errors with codes, retryable flags, safe details, and timestamps. API endpoints map extraction errors to stable HTTP status codes and never crash the server. Failed extraction attempts are tracked in-memory at service/repository level (`pending|succeeded|failed`) with provider, project/document IDs, and safe error messages to support UI history and future PostgreSQL migration.
+
+## Report section generation
+
+The system now supports deterministic, template-based report section generation in `packages/reports` and API/UI integration for editable markdown draft sections. Generated sections use approved and user-entered values by default, include assumptions/warnings/missing information/source references when provided, and explicitly avoid treating unreviewed AI-extracted values as final.
