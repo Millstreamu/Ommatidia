@@ -55,7 +55,7 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
           <select name="documentType"><option value="datasheet">datasheet</option><option value="manual">manual</option><option value="quote">quote</option><option value="schematic">schematic</option><option value="drawing">drawing</option><option value="other">other</option></select>
           <button>Upload document</button>
         </form>
-        <ul>${documents.map((d)=>`<li>${d.originalFilename} | ${d.documentType} | ${d.fileSizeBytes} bytes | ${d.uploadStatus}/${d.processingStatus} | ${new Date(d.createdAt).toISOString()} | <a href="${apiBaseUrl}/documents/${d.id}/file" target="_blank" rel="noreferrer">View</a> <button data-extract-doc-id="${d.id}">Extract values</button> <span id="extract-status-${d.id}"></span></li>`).join('')}</ul>
+        <ul>${documents.map((d)=>`<li>${d.originalFilename} | ${d.documentType} | ${d.fileSizeBytes} bytes | ${d.uploadStatus}/${d.processingStatus} | ${new Date(d.createdAt).toISOString()} | <a href="${apiBaseUrl}/documents/${d.id}/file" target="_blank" rel="noreferrer">View</a> <button data-extract-doc-id="${d.id}">Extract values</button> <button data-retry-doc-id="${d.id}">Retry extraction</button> <span id="extract-status-${d.id}"></span><ul id="extract-attempts-${d.id}"></ul></li>`).join('')}</ul>
 
         <h3>Hydraulic Power</h3>
         <form id="calc-form"><input name="flowLpm" placeholder="flowLpm" required/><input name="pressureBar" placeholder="pressureBar" required/><input name="efficiency" placeholder="efficiency" required/><button>Run</button></form>
@@ -89,10 +89,20 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
             statusEl.textContent = `Extracted ${result.candidateValues.length} candidate value(s)`;
             await load();
           } catch (error) {
-            statusEl.textContent = error instanceof Error ? error.message : 'Extraction failed';
+            const err = error as Error & { extractionError?: { errorCode?: string; message?: string; retryable?: boolean } }; const code = err.extractionError?.errorCode; const msgMap: Record<string,string> = { missing_api_key:'Missing API key for extraction provider.', request_timeout:'Extraction timed out.', rate_limited:'Rate limit reached.', invalid_model_response:'Invalid AI response.', invalid_json_response:'AI returned malformed JSON.', file_not_found:'Document file was not found.', unsupported_file_type:'Unsupported file type.' }; const base = code ? (msgMap[code] ?? 'Extraction failed.') : (err.message || 'Extraction failed'); statusEl.textContent = `${base}${err.extractionError?.retryable ? ' You can retry.' : ''}`;
           }
         };
       });
+
+
+      for (const d of documents) {
+        const attempts = await client.listExtractionAttempts(projectId, d.id);
+        const el = view.querySelector(`#extract-attempts-${d.id}`) as HTMLElement | null;
+        if (el) {
+          el.innerHTML = attempts.map((a) => `<li>${a.status} | ${a.valuesCreatedCount} values | ${a.errorCode ?? 'none'}</li>`).join('');
+        }
+      }
+      view.querySelectorAll<HTMLButtonElement>('button[data-retry-doc-id]').forEach((btn) => { btn.onclick = () => { const extractBtn = view.querySelector<HTMLButtonElement>(`button[data-extract-doc-id="${btn.dataset.retryDocId!}"]`); extractBtn?.click(); }; });
 
       view.querySelectorAll<HTMLButtonElement>('button[data-status-id]').forEach((btn) => {
         btn.onclick = async () => { await client.updateEngineeringValueStatus(btn.dataset.statusId!, btn.dataset.status as 'approved' | 'rejected'); await load(); };

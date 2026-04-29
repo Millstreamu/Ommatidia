@@ -22,3 +22,9 @@
 - Missing evidence must produce warnings and `missingInformation` entries instead of guesses.
 - AI extraction must never mark values as `approved` and must never perform final engineering calculations.
 - User-entered/approved values remain authoritative; extraction must not overwrite approved values.
+
+## Extraction failure safety
+
+- Invalid AI output (invalid JSON or schema-invalid values) must not be saved as engineering values.
+- AI extraction failures must be visible to users through explicit error states.
+- Failed extraction must not overwrite approved values.
