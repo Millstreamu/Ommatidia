@@ -31,3 +31,5 @@
 
 - OpenAI API keys must remain server-side environment variables only and must never be returned to browsers, logs, or client storage.
 - Runtime extraction provider switches must expose only safe status fields (provider + configured boolean), never secret material.
+
+- Extraction visibility: zero-value OpenAI extraction must show explicit warnings and diagnostics in API/UI attempts.

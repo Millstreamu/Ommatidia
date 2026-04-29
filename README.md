@@ -173,3 +173,8 @@ EXTRACTION_PROVIDER=mock npm run start --workspace @ommatidia/api
 - `file_not_found` / `unsupported_file_type`: re-upload a supported document.
 
 - Word report export is generated deterministically in `@ommatidia/reports` and returned as `.docx` from the API.
+
+### Troubleshooting: Extraction succeeded but returned 0 values
+- Check attempt warnings/diagnostics in the UI (provider, content read/sent, skipped conflicts).
+- Common causes: scanned/image-only PDF without OCR, no supported engineering fields, schema-invalid model candidates dropped, or approved-value conflicts skipped.
+- Re-upload a text-readable datasheet/manual and retry.
