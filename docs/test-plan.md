@@ -215,3 +215,8 @@ Package-focused (optional):
 
 - [x] Task 16C: Candidate normalization + safe dropped-candidate diagnostics + UI warning detail for extraction drops.
 - [x] Task 16E: PDF visible-text extraction diagnostics + internal-metadata detection + safe OpenAI gating + UI diagnostic summary.
+
+- [ ] Task 16G: suspicious/internal PDF extraction routes to OpenAI vision/file fallback when OpenAI provider is active.
+- [ ] Task 16G: mock provider must not call OpenAI fallback.
+- [ ] Task 16G: created counts reflect only persisted EngineeringValue rows.
+- [ ] Task 16G: unassigned extracted values are visible in UI.

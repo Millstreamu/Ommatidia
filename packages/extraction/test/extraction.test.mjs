@@ -87,13 +87,12 @@ test('extraction request uses selected document content only (no stale text)', a
 });
 
 
-test('pdf internal text is classified suspicious and blocks model call', async () => {
+test('pdf internal text is classified suspicious and triggers fallback model call', async () => {
   await withTempPdf('/Font /Encoding 12 0 R obj endobj stream endstream xref trailer', async (pdfPath) => {
     let called = false;
     const svc = new OpenAiExtractionService({ responses: { create: async () => { called = true; return { output_text: '{"candidateValues":[],"missingInformation":[],"warnings":[]}' }; } } });
     const result = await svc.extractEngineeringValues({ projectId: 'p', documentId: 'd', document: doc, documentFilePath: pdfPath });
-    assert.equal(called, false);
-    assert.match(result.warnings.join(' | '), /mostly internal PDF structure/i);
+    assert.equal(called, true);
   });
 });
 
@@ -107,4 +106,23 @@ test('deterministic fallback extracts danfoss-like values from visible text', as
     assert.ok(keys.includes('load_sensing_setting'));
     assert.ok(keys.includes('rotation'));
   });
+});
+test('suspicious pdf text triggers file/vision fallback in openai mode', async () => {
+  await withTempPdf('/Page /Resources /MediaBox stream endstream', async (pdfPath) => {
+    let called = false;
+    const svc = new OpenAiExtractionService({ responses: { create: async () => { called = true; return { output_text: '{"candidateValues":[{"label":"Manufacturer","value":"Danfoss"}],"missingInformation":[],"warnings":[]}' }; } } });
+    const result = await svc.extractEngineeringValues({ projectId: 'p', documentId: 'd', document: doc, documentFilePath: pdfPath });
+    assert.equal(called, true);
+    assert.equal(result.candidateValues[0].status, 'needs_review');
+  });
+});
+test('image uploads use vision fallback path', async () => {
+  const imageDoc = { ...doc, mimeType: 'image/png', originalFilename: 'pump.png' };
+  const imagePath = path.join(os.tmpdir(), `extract-${Date.now()}.png`);
+  await writeFile(imagePath, new Uint8Array([137,80,78,71]));
+  try {
+    const svc = new OpenAiExtractionService({ responses: { create: async () => ({ output_text: '{"candidateValues":[{"label":"Rotation","value":"clockwise"}],"missingInformation":[],"warnings":[]}' }) } });
+    const result = await svc.extractEngineeringValues({ projectId: 'p', documentId: 'd', document: imageDoc, documentFilePath: imagePath });
+    assert.equal(result.candidateValues.length, 1);
+  } finally { await unlink(imagePath).catch(() => undefined); }
 });

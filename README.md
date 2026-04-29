@@ -207,3 +207,9 @@ EXTRACTION_PROVIDER=mock npm run start --workspace @ommatidia/api
 
 ## Troubleshooting
 - If OpenAI reports the file looks like PDF metadata/internal structure, use extraction attempt debug details and extracted text preview to verify what text is sent.
+
+## Troubleshooting PDF extraction
+
+- If diagnostics show a high suspicious/internal ratio, extracted text likely contains PDF internals instead of visible text.
+- In OpenAI provider mode, the system now attempts a vision/file fallback for PDFs/images.
+- If fallback is unavailable, extraction warns: "This PDF needs vision/OCR extraction, but no vision fallback is configured."

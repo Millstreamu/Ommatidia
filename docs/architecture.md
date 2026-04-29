@@ -79,3 +79,11 @@ The API now includes an in-memory reusable component library for promoting appro
 - This prevents unrelated candidates from being produced when OCR/vision is not available.
 
 - Added document text extraction diagnostics with suspicious/internal ratio and limited text previews for extraction attempts.
+
+## Extraction decision tree (PDF/image)
+
+1. Upload document.
+2. Run text extraction.
+3. If visible text is useful: run deterministic + OpenAI text extraction.
+4. If text is mostly PDF internals / too low utility: run OpenAI file/vision fallback.
+5. If no fallback is configured: return warning and no fabricated values.

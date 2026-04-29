@@ -256,13 +256,17 @@ test('UI renders concise dropped-candidate warnings', () => {
 });
 test('UI renders concise extraction diagnostics and warning', () => {
   const text = renderExtractionDiagnostics({ warnings: ['PDF text extraction produced mostly internal PDF structure rather than visible text.'], diagnostics: { contentSentToModel: false, pdfTextExtraction: { extractedCharacterCount: 200, usefulTextCharacterCount: 10, suspiciousInternalTextRatio: 0.8 } } });
-  assert.match(text, /Text extracted: yes/);
+  assert.match(text, /Text extracted useful: no/);
   assert.match(text, /useful chars: 10/);
-  assert.match(text, /OpenAI called: no/);
+  assert.match(text, /OpenAI text called: no/);
 });
 
 
 test('UI diagnostics includes suspicious ratio and preview label', () => {
   const text = renderExtractionDiagnostics({ warnings: [], diagnostics: { contentSentToModel: true, pdfTextExtraction: { extractedCharacterCount: 300, usefulTextCharacterCount: 200, suspiciousInternalTextRatio: 0.25 } } });
   assert.match(text, /suspicious\/internal ratio: 0.25/);
+});
+test('UI diagnostics includes file/vision fallback called field', () => {
+  const text = renderExtractionDiagnostics({ warnings: [], diagnostics: { contentSentToModel: false, openAiFallback: { called: true }, pdfTextExtraction: { extractedCharacterCount: 10, usefulTextCharacterCount: 2, suspiciousInternalTextRatio: 0.9 } } });
+  assert.match(text, /OpenAI file\/vision fallback called: yes/);
 });

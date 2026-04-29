@@ -59,3 +59,9 @@
 - When text extraction fails, AI must not invent engineering values and must explicitly recommend OCR/vision extraction.
 
 - Extraction previews must be sanitized and capped (1000 chars max) and must not expose full document text or secrets in UI/logs by default.
+
+## PDF internals and vision fallback safety
+
+- Do not infer engineering values from PDF internals (`/Page`, `/Resources`, object streams, etc.).
+- If text extraction is suspicious, use vision/file fallback when available.
+- Vision/file extracted values must remain `needs_review` or `ai_extracted` until user approval.
