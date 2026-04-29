@@ -30,6 +30,12 @@ export class ApiClient {
   generateReportSection(input: { projectId: string; componentId?: string; sectionType: 'component_summary' | 'calculation_summary' | 'assumptions_and_warnings' | 'missing_information' | 'source_references'; engineeringValues: EngineeringValue[]; missingInformation?: string[]; assumptions?: string[]; warnings?: string[] }) { return this.request<ReportSection>('/report-sections/generate', { method: 'POST', body: JSON.stringify(input) }); }
   listReportSections(projectId: string) { return this.request<ReportSection[]>(`/report-sections?projectId=${projectId}`); }
   updateReportSection(id: string, input: { title?: string; bodyMarkdown?: string; status?: string }) { return this.request<ReportSection>(`/report-sections/${id}`, { method: 'PATCH', body: JSON.stringify(input) }); }
+
+  listComponentLibrary(q?: string) { return this.request<ComponentLibraryItem[]>(`/component-library${q ? `?q=${encodeURIComponent(q)}` : ''}`); }
+  promoteComponentToLibrary(input: { projectId: string; componentId: string; name?: string; tags?: string[] }) { return this.request<ComponentLibraryItem>('/component-library/promote', { method: 'POST', body: JSON.stringify(input) }); }
+  copyLibraryToProject(libraryId: string, input: { targetProjectId: string; componentName?: string }) { return this.request<{ component: Component; engineeringValues: EngineeringValue[] }>(`/component-library/${libraryId}/copy-to-project`, { method: 'POST', body: JSON.stringify(input) }); }
+  compareLibraryWithComponent(libraryId: string, input: { targetProjectId: string; targetComponentId: string }) { return this.request<{ matching: unknown[]; differing: unknown[]; missingInTarget: unknown[]; extraInTarget: unknown[] }>(`/component-library/${libraryId}/compare`, { method: 'POST', body: JSON.stringify(input) }); }
+
   async exportReportSectionsDocx(input: { projectId: string; reportSectionIds: string[]; documentTitle?: string; includeSourceReferences?: boolean }) {
     const response = await fetch(`${this.baseUrl}/report-sections/export-docx`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) });
     if (!response.ok) throw new Error(`API request failed (${response.status})`);
@@ -42,3 +48,6 @@ export interface ExtractionErrorResponse { errorCode: string; message: string; r
 export interface ExtractionResult { candidateValues: EngineeringValue[]; missingInformation: string[]; warnings: string[]; providerMetadata?: { provider: string; model?: string }; valuesCreatedCount?: number }
 export interface ExtractionAttempt { id: string; projectId: string; documentId: string; provider: string; status: 'pending'|'succeeded'|'failed'; startedAt: string; completedAt?: string; errorCode?: string; safeErrorMessage?: string; valuesCreatedCount: number }
 export interface ReportSection { id: string; projectId: string; title: string; bodyMarkdown: string; sourceReferences: Array<{ documentId: string; pageNumber?: number; sectionTitle?: string; sourceText?: string }>; status: string; createdAt: string; updatedAt: string; }
+
+export interface LibraryEngineeringValue { key:string; label:string; value:number|string|boolean; valueType:string; unit?:string; status:string; notes?:string; sourceReferences:Array<{documentId:string; pageNumber?:number; sectionTitle?:string; sourceText?:string}> }
+export interface ComponentLibraryItem { id:string; name:string; componentType:string; description?:string; approvedEngineeringValues:LibraryEngineeringValue[]; tags:string[]; createdAt:string; updatedAt:string }
