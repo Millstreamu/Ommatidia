@@ -5,6 +5,10 @@ export function validateEngineeringValueForm(input: Record<string, string>): str
   return required.filter((field) => !input[field]?.trim()).map((field) => `${field} is required`);
 }
 
+export function renderDocumentList(documents: Array<{ originalFilename: string; documentType: string; fileSizeBytes: number; uploadStatus: string; processingStatus: string; createdAt: string; id: string }>, apiBaseUrl: string): string {
+  return documents.map((d) => `<li>${d.originalFilename} | ${d.documentType} | ${d.fileSizeBytes} bytes | ${d.uploadStatus}/${d.processingStatus} | ${new Date(d.createdAt).toISOString()} | <a href="${apiBaseUrl}/documents/${d.id}/file" target="_blank" rel="noreferrer">View</a></li>`).join('');
+}
+
 export async function renderProjectList(client: ApiClient): Promise<string> {
   const projects = await client.listProjects();
   return projects.map((p) => `<li><a href="#/projects/${p.id}">${p.name}</a> — ${p.description ?? ''} (${new Date(p.createdAt).toISOString()})</li>`).join('');
@@ -19,11 +23,12 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
     const hash = window.location.hash;
     if (hash.startsWith('#/projects/')) {
       const projectId = hash.split('/')[2];
-      const [project, components, values, modules] = await Promise.all([
+      const [project, components, values, modules, documents] = await Promise.all([
         client.getProject(projectId),
         client.listComponents(projectId),
         client.listEngineeringValues(projectId),
-        client.listModules()
+        client.listModules(),
+        client.listDocuments(projectId)
       ]);
       const valuesByComponent = components.map((c) => ({ component: c, values: values.filter((v) => v.componentId === c.id) }));
       view.innerHTML = `
@@ -43,6 +48,15 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
         </form>
         <h3>Engineering modules</h3>
         <ul>${modules.map((m) => `<li>${m.name} (${m.moduleType})</li>`).join('')}</ul>
+        
+        <h3>Documents</h3>
+        <form id="document-form">
+          <input name="file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" required/>
+          <select name="documentType"><option value="datasheet">datasheet</option><option value="manual">manual</option><option value="quote">quote</option><option value="schematic">schematic</option><option value="drawing">drawing</option><option value="other">other</option></select>
+          <button>Upload document</button>
+        </form>
+        <ul>${renderDocumentList(documents, apiBaseUrl)}</ul>
+
         <h3>Hydraulic Power</h3>
         <form id="calc-form"><input name="flowLpm" placeholder="flowLpm" required/><input name="pressureBar" placeholder="pressureBar" required/><input name="efficiency" placeholder="efficiency" required/><button>Run</button></form>
         <pre id="calc-result"></pre>
@@ -69,6 +83,15 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
       view.querySelectorAll<HTMLButtonElement>('button[data-status-id]').forEach((btn) => {
         btn.onclick = async () => { await client.updateEngineeringValueStatus(btn.dataset.statusId!, btn.dataset.status as 'approved' | 'rejected'); await load(); };
       });
+
+      (view.querySelector('#document-form') as HTMLFormElement).onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget as HTMLFormElement);
+        const selectedFile = fd.get('file');
+        if (!(selectedFile instanceof File)) { alert('File is required'); return; }
+        await client.uploadDocument(projectId, selectedFile, String(fd.get('documentType') || 'other'));
+        await load();
+      };
 
       (view.querySelector('#calc-form') as HTMLFormElement).onsubmit = async (e) => {
         e.preventDefault();

@@ -69,3 +69,7 @@ npm run start --workspace @ommatidia/web
 Notes:
 - The web UI currently supports **manual entry only** for projects, components, and engineering values.
 - AI extraction and document upload will be added in later tasks.
+
+## Local document uploads
+
+API uploads are stored in `storage/uploads/` for local development only. The folder is gitignored and should be replaced by managed object storage in production. This task only stores raw files + metadata (no OCR/extraction yet).
