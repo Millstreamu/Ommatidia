@@ -1,7 +1,9 @@
-import { createServer } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import type { ServerResponse } from 'node:http';
+import type { IncomingMessage, RequestOptions, ServerResponse } from 'node:http';
+
+const API_PROXY_TARGET = process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:3001';
 
 const html = `<!doctype html>
 <html lang="en">
@@ -41,6 +43,56 @@ const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
   '.map': 'application/json; charset=utf-8'
 };
 
+function copyResponseHeaders(proxyResponse: IncomingMessage, res: ServerResponse): void {
+  for (const [name, value] of Object.entries(proxyResponse.headers ?? {})) {
+    if (value === undefined) continue;
+    res.setHeader(name, value);
+  }
+}
+
+async function proxyApiRequest(req: IncomingMessage, res: ServerResponse, urlPath: string): Promise<boolean> {
+  if (!urlPath.startsWith('/api/')) {
+    return false;
+  }
+
+  const target = new URL(API_PROXY_TARGET);
+  const forwardPath = urlPath.slice(4);
+  const originalUrl = new URL(req.url ?? '/', 'http://localhost');
+  const pathWithQuery = `${forwardPath}${originalUrl.search}`;
+
+  const headers = { ...req.headers };
+  delete headers.host;
+
+  const options: RequestOptions = {
+    protocol: target.protocol,
+    hostname: target.hostname,
+    port: target.port,
+    method: req.method,
+    path: pathWithQuery,
+    headers
+  };
+
+  await new Promise<void>((resolvePromise) => {
+    const upstream = httpRequest(options, (proxyResponse) => {
+      res.statusCode = (proxyResponse as IncomingMessage & { statusCode?: number }).statusCode ?? 502;
+      copyResponseHeaders(proxyResponse, res);
+      proxyResponse.pipe(res);
+      proxyResponse.on('end', resolvePromise);
+    });
+
+    upstream.on('error', (error) => {
+      res.statusCode = 502;
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'API proxy request failed', message: (error as Error).message }));
+      resolvePromise();
+    });
+
+    req.pipe(upstream);
+  });
+
+  return true;
+}
+
 async function serveStaticAsset(urlPath: string, res: ServerResponse): Promise<boolean> {
   const directAsset = JS_ROUTE_TO_FILE[urlPath];
   const mapAsset = urlPath.endsWith('.map') ? JS_ROUTE_TO_FILE[urlPath.slice(0, -4)] + '.map' : undefined;
@@ -73,6 +125,7 @@ async function serveStaticAsset(urlPath: string, res: ServerResponse): Promise<b
 export function startWebApp(port = 3000): ReturnType<typeof createServer> {
   const server = createServer(async (req, res) => {
     const path = (req.url ?? '/').split('?')[0] ?? '/';
+    if (await proxyApiRequest(req, res, path)) return;
     if (await serveStaticAsset(path, res)) return;
     if (path !== '/') {
       res.statusCode = 404;

@@ -85,7 +85,7 @@ This test plan defines acceptance criteria and validation strategy for existing 
 ### UI usability and workflow clarity
 - [ ] Root web route (`/`) opens the main Projects UI without requiring a custom path.
 - [ ] Projects page shows empty/loading/error states with clear create/open affordances.
-- [ ] Projects page shows API base URL debug line in development/Codespaces.
+- [ ] Projects page shows API base URL debug line as `/api` in development/Codespaces.
 - [ ] Project details are grouped into workflow sections (overview, components, values, documents, extraction, calculations, report, export).
 - [ ] Engineering value statuses are visually explicit, with clear approve/reject actions.
 - [ ] Document extraction surfaces loading/success/friendly error/retry cues.
@@ -120,6 +120,7 @@ This test plan defines acceptance criteria and validation strategy for existing 
 | Oversized file rejection | Missing (size limit not implemented) |
 | Uploaded document metadata listed | Covered by UI test |
 | Web root route (`/`) serves Projects UI shell | Covered by UI test |
+| Browser API calls use same-origin `/api` and web server strips `/api` when proxying to API on 3001 | Covered by UI/web proxy tests |
 | Projects empty/list rendering states | Covered by UI test |
 | Project details workflow section headings | Covered by UI test |
 | Engineering status badge rendering | Covered by UI test |

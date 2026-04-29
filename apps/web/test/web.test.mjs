@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, resolveApiBaseUrl, submitCreateProject } from '../dist/app.js';
 import { startWebApp } from '../dist/index.js';
+import { createServer } from 'node:http';
 import { ApiClient } from '../dist/apiClient.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,13 +23,9 @@ test('engineering value form validates required fields', () => {
   assert.ok(errors.length >= 4);
 });
 
-test('resolveApiBaseUrl returns localhost default outside Codespaces', () => {
-  assert.equal(resolveApiBaseUrl('localhost'), 'http://127.0.0.1:3001');
-});
-
-test('resolveApiBaseUrl maps Codespaces port 3000 host to 3001 host', () => {
-  const host = 'friendly-space-abc123-3000.app.github.dev';
-  assert.equal(resolveApiBaseUrl(host), 'https://friendly-space-abc123-3001.app.github.dev');
+test('resolveApiBaseUrl defaults to same-origin /api', () => {
+  assert.equal(resolveApiBaseUrl('localhost'), '/api');
+  assert.equal(resolveApiBaseUrl('friendly-space-abc123-3000.app.github.dev'), '/api');
 });
 
 test('project empty state and list rendering', () => {
@@ -134,7 +131,7 @@ test('unknown javascript path returns 404', async () => {
 test('project create failure resets loading state and shows error', async () => {
   const states = [];
   const status = [];
-  const client = { createProject: async () => { throw new Error('Could not reach the API. Check that port 3001 is running and forwarded.'); } };
+  const client = { createProject: async () => { throw new Error('Could not reach the API. Check that the web server is running on port 3000 and API proxy /api is reachable.'); } };
   await submitCreateProject(client, { name: 'Demo', projectType: 'custom' }, (v) => status.push(v), (b) => states.push(b), async () => {});
   assert.deepEqual(states, [true, false]);
   assert.match(status.at(-1), /Could not create project:/);
@@ -144,6 +141,67 @@ test('API client converts network fetch failure into helpful message', async () 
   const originalFetch = global.fetch;
   global.fetch = async () => { throw new TypeError('Failed to fetch'); };
   const client = new ApiClient('http://127.0.0.1:3001');
-  await assert.rejects(() => client.listProjects(), /Could not reach the API\. Check that port 3001 is running and forwarded\./);
+  await assert.rejects(() => client.listProjects(), /Could not reach the API\. Check that the web server is running on port 3000 and API proxy \/api is reachable\./);
   global.fetch = originalFetch;
+});
+
+
+test('GET /api/projects proxies to /projects and strips prefix', async () => {
+  const calls = [];
+  const apiServer = createServer((req, res) => {
+    calls.push({ method: req.method, url: req.url, headers: req.headers });
+    res.statusCode = 200;
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify([{ id: 'p1' }]));
+  });
+  await new Promise((resolve) => apiServer.listen(3001, '127.0.0.1', resolve));
+  try {
+    await withWebServer(async (base) => {
+      const res = await fetch(base + '/api/projects?projectId=p1');
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body[0].id, 'p1');
+    });
+    assert.equal(calls[0].url, '/projects?projectId=p1');
+    assert.equal(calls[0].method, 'GET');
+  } finally {
+    apiServer.close();
+  }
+});
+
+test('POST /api/projects proxies body and upload-like headers', async () => {
+  let receivedBody = '';
+  let receivedHeaders = {};
+  const apiServer = createServer((req, res) => {
+    receivedHeaders = req.headers;
+    req.setEncoding('utf8');
+    req.on('data', (chunk) => { receivedBody += chunk; });
+    req.on('end', () => {
+      res.statusCode = 201;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ ok: true, path: req.url }));
+    });
+  });
+  await new Promise((resolve) => apiServer.listen(3001, '127.0.0.1', resolve));
+  try {
+    await withWebServer(async (base) => {
+      const res = await fetch(base + '/api/projects', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-document-type': 'datasheet',
+          'x-filename': 'pump.pdf'
+        },
+        body: JSON.stringify({ name: 'Demo' })
+      });
+      assert.equal(res.status, 201);
+      const body = await res.json();
+      assert.equal(body.path, '/projects');
+    });
+    assert.match(receivedBody, /"name":"Demo"/);
+    assert.equal(receivedHeaders['x-document-type'], 'datasheet');
+    assert.equal(receivedHeaders['x-filename'], 'pump.pdf');
+  } finally {
+    apiServer.close();
+  }
 });
