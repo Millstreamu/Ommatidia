@@ -1,3 +1,5 @@
+export function getApiBaseUrlForDebug(baseUrl: string): string { return baseUrl; }
+
 export interface Project { id: string; name: string; description?: string; projectType: string; createdAt: string; updatedAt: string; }
 export interface Component { id: string; projectId: string; name: string; type: string; description?: string; createdAt: string; updatedAt: string; }
 export interface EngineeringValue { id: string; projectId: string; componentId?: string; key: string; label: string; value: number | string | boolean; valueType: string; unit?: string; status: string; createdAt: string; updatedAt: string; }
@@ -6,9 +8,18 @@ export interface DocumentRecord { id: string; projectId: string; originalFilenam
 
 export interface HydraulicPowerResponse { moduleId: string; projectId: string; inputsUsed: Array<{ key: string; label: string; value: number | string | boolean; valueType: string; unit?: string }>; outputs: Array<{ key: string; label: string; value: number | string | boolean; valueType: string; unit?: string }>; warnings: string[]; assumptions: string[]; createdAt: string; }
 
+
+function toHelpfulNetworkError(error: unknown): Error {
+  const message = (error as Error)?.message ?? '';
+  if (message.includes('Failed to fetch') || message.includes('NetworkError') || message.includes('fetch')) {
+    return new Error('Could not reach the API. Check that port 3001 is running and forwarded.');
+  }
+  return error instanceof Error ? error : new Error('Unknown network error');
+}
+
 export class ApiClient {
   constructor(private readonly baseUrl: string) {}
-  private async request<T>(path: string, init?: RequestInit): Promise<T> { const response = await fetch(`${this.baseUrl}${path}`, { ...init, headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) } }); if (!response.ok) { let body: any = undefined; try { body = await response.json(); } catch {} const err = new Error(body?.message ?? `API request failed (${response.status})`) as Error & { extractionError?: ExtractionErrorResponse }; if (body?.errorCode) err.extractionError = body as ExtractionErrorResponse; throw err; } return response.json() as Promise<T>; }
+  private async request<T>(path: string, init?: RequestInit): Promise<T> { let response: Response; try { response = await fetch(`${this.baseUrl}${path}`, { ...init, headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) } }); } catch (error) { throw toHelpfulNetworkError(error); } if (!response.ok) { let body: any = undefined; try { body = await response.json(); } catch {} const err = new Error(body?.message ?? `API request failed (${response.status})`) as Error & { extractionError?: ExtractionErrorResponse }; if (body?.errorCode) err.extractionError = body as ExtractionErrorResponse; throw err; } return response.json() as Promise<T>; }
   listProjects() { return this.request<Project[]>('/projects'); }
   createProject(input: { name: string; description?: string; projectType: string }) { return this.request<Project>('/projects', { method: 'POST', body: JSON.stringify(input) }); }
   getProject(projectId: string) { return this.request<Project>(`/projects/${projectId}`); }

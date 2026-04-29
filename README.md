@@ -53,6 +53,15 @@ Notes:
 - If the web UI appears blank, open the browser developer console and check for JavaScript errors.
 - In GitHub Codespaces, use forwarded port `3000` for web and forwarded port `3001` for API; the web app automatically maps the forwarded `3000` hostname to `3001` for API calls.
 
+
+### Troubleshooting web/API connection in Codespaces
+
+- Web UI runs on port **3000**.
+- API runs on port **3001**.
+- In GitHub Codespaces, both ports must be running and forwarded.
+- If the Projects page shows `Failed to fetch`, verify port 3001 is running and forwarded, then retry.
+- Browser requests between `...-3000.app.github.dev` and `...-3001.app.github.dev` rely on API CORS headers; if API is down or not forwarded, requests fail in-browser even if local curl worked earlier.
+
 ## Repository layout
 
 - `apps/web` — future web frontend shell
