@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, resolveApiBaseUrl, submitCreateProject } from '../dist/app.js';
+import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject } from '../dist/app.js';
 import { startWebApp } from '../dist/index.js';
 import { createServer } from 'node:http';
 import { ApiClient } from '../dist/apiClient.js';
@@ -236,4 +236,13 @@ test('POST /api/projects proxies body and upload-like headers', async () => {
   } finally {
     apiServer.close();
   }
+});
+
+
+test('UI formats safe extraction diagnostics for users', () => {
+  const text = formatExtractionFailure(Object.assign(new Error('x'), { extractionError: { errorCode: 'model_not_found', message: 'OpenAI extraction failed: model not found', retryable: false, userAction: 'Check the configured model name', details: { safeProviderMessage: 'The model does not exist' } } }));
+  assert.match(text, /model_not_found/);
+  assert.match(text, /Retryable: no/);
+  assert.match(text, /Check the configured model name/);
+  assert.match(text, /The model does not exist/);
 });

@@ -5,7 +5,7 @@ export interface Component { id: string; projectId: string; name: string; type: 
 export interface EngineeringValue { id: string; projectId: string; componentId?: string; key: string; label: string; value: number | string | boolean; valueType: string; unit?: string; status: string; createdAt: string; updatedAt: string; }
 export interface EngineeringModule { id: string; name: string; description: string; moduleType: string; }
 export interface DocumentRecord { id: string; projectId: string; originalFilename: string; storedFilename: string; mimeType: string; fileSizeBytes: number; documentType: string; uploadStatus: string; processingStatus: string; createdAt: string; updatedAt: string; }
-export interface SystemStatus { ok: boolean; extractionProvider: 'openai' | 'mock' | 'unknown'; openAiConfigured: boolean; apiProxyMode: boolean; timestamp: string; }
+export interface SystemStatus { ok: boolean; extractionProvider: 'openai' | 'mock' | 'unknown'; openAiConfigured: boolean; openAiModel?: string; apiProxyMode: boolean; timestamp: string; }
 
 export interface HydraulicPowerResponse { moduleId: string; projectId: string; inputsUsed: Array<{ key: string; label: string; value: number | string | boolean; valueType: string; unit?: string }>; outputs: Array<{ key: string; label: string; value: number | string | boolean; valueType: string; unit?: string }>; warnings: string[]; assumptions: string[]; createdAt: string; }
 

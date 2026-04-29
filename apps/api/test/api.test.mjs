@@ -136,6 +136,7 @@ test('system status returns openAiConfigured false when OPENAI_API_KEY missing',
       const body = await res.json();
       assert.equal(body.extractionProvider, 'openai');
       assert.equal(body.openAiConfigured, false);
+      assert.ok(body.openAiModel);
     });
   } finally {
     process.env.EXTRACTION_PROVIDER = prevProvider;
@@ -154,6 +155,7 @@ test('system status returns openAiConfigured true when OPENAI_API_KEY set', asyn
       assert.equal(res.status, 200);
       const body = await res.json();
       assert.equal(body.openAiConfigured, true);
+      assert.ok(body.openAiModel);
     });
   } finally {
     process.env.EXTRACTION_PROVIDER = prevProvider;

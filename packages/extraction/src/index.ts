@@ -2,7 +2,7 @@ declare const process: { env: Record<string,string|undefined> };
 import { engineeringValueSchema, type Document, type EngineeringValue } from '@ommatidia/shared';
 
 export type ExtractionErrorCode =
-  | 'missing_api_key' | 'provider_unavailable' | 'request_timeout' | 'rate_limited' | 'invalid_model_response' | 'invalid_json_response'
+  | 'missing_api_key' | 'invalid_api_key' | 'permission_denied' | 'provider_unavailable' | 'request_timeout' | 'rate_limited' | 'model_not_found' | 'bad_request' | 'network_failure' | 'invalid_model_response' | 'invalid_json_response'
   | 'file_not_found' | 'unsupported_file_type' | 'file_too_large' | 'extraction_failed' | 'unknown_error';
 export interface ExtractionErrorResponse { errorCode: ExtractionErrorCode; message: string; retryable: boolean; userAction?: string; details?: Record<string, unknown>; timestamp: string; }
 export class ExtractionError extends Error { constructor(public readonly payload: ExtractionErrorResponse) { super(payload.message); } }
@@ -12,11 +12,59 @@ export interface ExtractEngineeringValuesResult { candidateValues: EngineeringVa
 export interface ExtractionService { extractEngineeringValues(input: ExtractEngineeringValuesInput): Promise<ExtractEngineeringValuesResult>; }
 export function normalizedExtractionError(errorCode: ExtractionErrorCode, message: string, retryable = false, options?: { userAction?: string; details?: Record<string, unknown> }): ExtractionErrorResponse { return { errorCode, message, retryable, userAction: options?.userAction, details: options?.details, timestamp: new Date().toISOString() }; }
 
-const RETRYABLE = new Set<ExtractionErrorCode>(['provider_unavailable', 'request_timeout', 'rate_limited']);
+const RETRYABLE = new Set<ExtractionErrorCode>(['provider_unavailable', 'request_timeout', 'rate_limited', 'network_failure']);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const SUPPORTED_MIME = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/webp']);
+const DEFAULT_OPENAI_MODEL = 'gpt-4.1-mini';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> { return new Promise((resolve, reject) => { const t = setTimeout(() => reject(new ExtractionError(normalizedExtractionError('request_timeout', `Extraction timed out after ${timeoutMs}ms`, true, { userAction: 'Try again in a moment.' }))), timeoutMs); promise.then((v) => { clearTimeout(t); resolve(v); }).catch((e) => { clearTimeout(t); reject(e); }); }); }
+
+function sanitizeProviderMessage(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const compact = value.replace(/\s+/g, ' ').trim();
+  if (!compact) return undefined;
+  const redacted = compact
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [REDACTED]')
+    .replace(/sk-[A-Za-z0-9_-]+/g, 'sk-[REDACTED]')
+    .replace(/authorization/gi, '[redacted-header]');
+  return redacted.slice(0, 240);
+}
+
+function toDiagnosticError(errorCode: ExtractionErrorCode, message: string, retryable: boolean, options: { model: string; statusCode?: number; errorType?: string; safeProviderMessage?: string; userAction: string }): ExtractionError {
+  return new ExtractionError(normalizedExtractionError(errorCode, message, retryable, { userAction: options.userAction, details: { provider: 'openai', model: options.model, statusCode: options.statusCode, errorType: options.errorType, safeProviderMessage: options.safeProviderMessage, retryable, userAction: options.userAction } }));
+}
+
+function mapOpenAiError(error: unknown, model: string): ExtractionError {
+  const raw = error as { status?: number; code?: string; type?: string; message?: string; name?: string; error?: { type?: string; code?: string; message?: string } };
+  const statusCode = typeof raw?.status === 'number' ? raw.status : undefined;
+  const errorType = typeof raw?.type === 'string' ? raw.type : (typeof raw?.error?.type === 'string' ? raw.error.type : undefined);
+  const errorCode = typeof raw?.code === 'string' ? raw.code : (typeof raw?.error?.code === 'string' ? raw.error.code : undefined);
+  const safeProviderMessage = sanitizeProviderMessage(raw?.error?.message ?? raw?.message ?? (error instanceof Error ? error.message : undefined));
+
+  if (statusCode === 401 || errorCode === 'invalid_api_key' || errorType === 'invalid_request_error' && safeProviderMessage?.toLowerCase().includes('api key')) {
+    return toDiagnosticError('invalid_api_key', 'OpenAI extraction failed: invalid API key.', false, { model, statusCode, errorType, safeProviderMessage, userAction: 'Verify OPENAI_API_KEY on the server.' });
+  }
+  if (statusCode === 403) {
+    return toDiagnosticError('permission_denied', 'OpenAI extraction failed: permission denied.', false, { model, statusCode, errorType, safeProviderMessage, userAction: 'Check project permissions and model access for this API key.' });
+  }
+  if (statusCode === 404 || errorCode === 'model_not_found') {
+    return toDiagnosticError('model_not_found', 'OpenAI extraction failed: model not found.', false, { model, statusCode, errorType, safeProviderMessage, userAction: 'Check the configured model name.' });
+  }
+  if (statusCode === 408 || statusCode === 504 || errorCode === 'request_timeout') {
+    return toDiagnosticError('request_timeout', 'OpenAI extraction request timed out.', true, { model, statusCode, errorType, safeProviderMessage, userAction: 'Retry in a moment.' });
+  }
+  if (statusCode === 429) {
+    return toDiagnosticError('rate_limited', 'OpenAI extraction failed: rate limit reached.', true, { model, statusCode, errorType, safeProviderMessage, userAction: 'Wait and retry, or reduce request frequency.' });
+  }
+  if (statusCode === 400 || errorType === 'invalid_request_error') {
+    return toDiagnosticError('bad_request', 'OpenAI extraction failed: invalid request payload.', false, { model, statusCode, errorType, safeProviderMessage, userAction: 'Review extraction request configuration and model settings.' });
+  }
+  const msg = safeProviderMessage?.toLowerCase() ?? '';
+  if ((error instanceof TypeError) || msg.includes('network') || msg.includes('fetch') || errorCode === 'api_connection_error') {
+    return toDiagnosticError('network_failure', 'OpenAI extraction failed: network connection issue.', true, { model, statusCode, errorType, safeProviderMessage, userAction: 'Check network connectivity and retry.' });
+  }
+  return toDiagnosticError('provider_unavailable', 'OpenAI extraction failed: provider unavailable.', true, { model, statusCode, errorType, safeProviderMessage, userAction: 'Retry shortly.' });
+}
 
 export class MockExtractionService implements ExtractionService {
   async extractEngineeringValues(input: ExtractEngineeringValuesInput): Promise<ExtractEngineeringValuesResult> {
@@ -26,16 +74,26 @@ export class MockExtractionService implements ExtractionService {
 }
 
 export class OpenAiExtractionService implements ExtractionService {
-  constructor(private readonly client: { responses: { create: (input: unknown) => Promise<{ output_text?: string }> } }, private readonly model = 'gpt-4.1-mini') {}
+  constructor(private readonly client: { responses: { create: (input: unknown) => Promise<{ output_text?: string }> } }, private readonly model = DEFAULT_OPENAI_MODEL) {}
+  static resolveModelFromEnv(): string { return (process.env.OPENAI_EXTRACTION_MODEL ?? DEFAULT_OPENAI_MODEL).trim() || DEFAULT_OPENAI_MODEL; }
   static fromEnv(): OpenAiExtractionService {
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new ExtractionError(normalizedExtractionError('missing_api_key', 'OPENAI_API_KEY is required for OpenAI extraction.', false, { userAction: 'Set OPENAI_API_KEY or use mock provider.' }));
+    const model = OpenAiExtractionService.resolveModelFromEnv();
+    if (!apiKey) throw new ExtractionError(normalizedExtractionError('missing_api_key', 'OPENAI_API_KEY is required for OpenAI extraction.', false, { userAction: 'Set OPENAI_API_KEY or use mock provider.', details: { provider: 'openai', model, retryable: false } }));
     const client = { responses: { create: async (input: unknown) => {
       const response = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` }, body: JSON.stringify(input) });
-      if (!response.ok) throw new Error(`OpenAI request failed (${response.status})`);
-      return response.json() as Promise<{ output_text?: string }>;
+      const responseJson = await response.json().catch(() => undefined) as { error?: { message?: string; type?: string; code?: string } } | undefined;
+      if (!response.ok) {
+        const err = new Error(responseJson?.error?.message ?? `OpenAI request failed (${response.status})`) as Error & { status?: number; type?: string; code?: string; error?: { message?: string; type?: string; code?: string } };
+        err.status = response.status;
+        err.type = responseJson?.error?.type;
+        err.code = responseJson?.error?.code;
+        err.error = responseJson?.error;
+        throw err;
+      }
+      return responseJson as { output_text?: string };
     } } };
-    return new OpenAiExtractionService(client);
+    return new OpenAiExtractionService(client, model);
   }
 
   async extractEngineeringValues(input: ExtractEngineeringValuesInput): Promise<ExtractEngineeringValuesResult> {
@@ -46,14 +104,14 @@ export class OpenAiExtractionService implements ExtractionService {
     let parsed: { candidateValues: Array<Record<string, unknown>>; missingInformation: string[]; warnings: string[] };
     try {
       const response = await this.client.responses.create({ model: this.model, input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }, { type: 'input_text', text: `Document server path: ${encodedDocument}` }] }], text: { format: { type: 'json_object' } } });
-      if (!response.output_text) throw new ExtractionError(normalizedExtractionError('invalid_model_response', 'Model returned empty output.', false));
+      if (!response.output_text) throw toDiagnosticError('invalid_model_response', 'Model returned empty output.', false, { model: this.model, userAction: 'Retry extraction or adjust prompt/model configuration.' });
       parsed = JSON.parse(response.output_text) as typeof parsed;
     } catch (error) {
       if (error instanceof ExtractionError) throw error;
-      if (error instanceof SyntaxError) throw new ExtractionError(normalizedExtractionError('invalid_json_response', 'Model returned invalid JSON.', false));
-      throw new ExtractionError(normalizedExtractionError('provider_unavailable', 'AI provider is unavailable.', true, { userAction: 'Retry shortly.' }));
+      if (error instanceof SyntaxError) throw toDiagnosticError('invalid_json_response', 'Model returned invalid JSON.', false, { model: this.model, userAction: 'Retry extraction; if it repeats, switch model or provider.' });
+      throw mapOpenAiError(error, this.model);
     }
-    if (!Array.isArray(parsed.candidateValues) || !Array.isArray(parsed.missingInformation) || !Array.isArray(parsed.warnings)) throw new ExtractionError(normalizedExtractionError('invalid_model_response', 'Model response failed schema checks.', false));
+    if (!Array.isArray(parsed.candidateValues) || !Array.isArray(parsed.missingInformation) || !Array.isArray(parsed.warnings)) throw toDiagnosticError('invalid_model_response', 'Model response failed schema checks.', false, { model: this.model, userAction: 'Retry extraction; if it repeats, adjust extraction configuration.' });
 
     const now = new Date().toISOString(); const candidateValues: EngineeringValue[] = []; let invalidCandidateCount = 0;
     for (let index = 0; index < parsed.candidateValues.length; index += 1) {
@@ -69,3 +127,4 @@ export class OpenAiExtractionService implements ExtractionService {
 
 export class RetryingExtractionService implements ExtractionService { constructor(private readonly inner: ExtractionService, private readonly timeoutMs = Number(process.env.EXTRACTION_TIMEOUT_MS ?? 15000), private readonly maxRetries = Number(process.env.EXTRACTION_MAX_RETRIES ?? 2)) {} async extractEngineeringValues(input: ExtractEngineeringValuesInput): Promise<ExtractEngineeringValuesResult> { let attempt = 0; while (true) { try { return await withTimeout(this.inner.extractEngineeringValues(input), this.timeoutMs); } catch (error) { const e = error instanceof ExtractionError ? error : new ExtractionError(normalizedExtractionError('unknown_error', 'Unknown extraction error', false)); if (RETRYABLE.has(e.payload.errorCode) && attempt < this.maxRetries) { attempt += 1; await sleep(150 * attempt); continue; } throw e; } } } }
 export function createExtractionService(mode = process.env.EXTRACTION_PROVIDER ?? 'mock'): ExtractionService { const base = mode === 'openai' ? OpenAiExtractionService.fromEnv() : new MockExtractionService(); return new RetryingExtractionService(base); }
+export function getDefaultOpenAiExtractionModel(): string { return OpenAiExtractionService.resolveModelFromEnv(); }

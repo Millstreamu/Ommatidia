@@ -157,6 +157,7 @@ API uploads are stored in `storage/uploads/` for local development only. The fol
 - `OPENAI_API_KEY` (required only for `openai`)
 - `EXTRACTION_TIMEOUT_MS` (default `15000`)
 - `EXTRACTION_MAX_RETRIES` (default `2`)
+- `OPENAI_EXTRACTION_MODEL` (default `gpt-4.1-mini`)
 
 ## Run with mock extraction
 
@@ -167,8 +168,14 @@ EXTRACTION_PROVIDER=mock npm run start --workspace @ommatidia/api
 ## Troubleshooting extraction errors
 
 - `missing_api_key`: set `OPENAI_API_KEY` or switch to `EXTRACTION_PROVIDER=mock`.
+- `invalid_api_key`: key is present but rejected by OpenAI; rotate/fix the key.
+- `permission_denied`: key/project lacks model access; verify organization/project permissions.
+- `model_not_found`: check `OPENAI_EXTRACTION_MODEL` value (or default model availability).
+- `bad_request`: request/model configuration invalid; review payload/model settings.
 - `request_timeout`: increase `EXTRACTION_TIMEOUT_MS` or retry.
-- `rate_limited`/`provider_unavailable`: retry later; retries are automatic up to `EXTRACTION_MAX_RETRIES`.
+- `rate_limited`: wait and retry; retries are automatic up to `EXTRACTION_MAX_RETRIES`.
+- `network_failure`: transient connectivity issue between API server and provider.
+- `provider_unavailable`: fallback when failure cannot be classified safely; retry later and inspect provider status.
 - `invalid_json_response` / `invalid_model_response`: provider output was malformed and is intentionally rejected/safeguarded.
 - `file_not_found` / `unsupported_file_type`: re-upload a supported document.
 

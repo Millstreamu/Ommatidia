@@ -33,3 +33,9 @@
 - Runtime extraction provider switches must expose only safe status fields (provider + configured boolean), never secret material.
 
 - Extraction visibility: zero-value OpenAI extraction must show explicit warnings and diagnostics in API/UI attempts.
+
+## OpenAI diagnostics safety rules (Task 16A)
+
+- Extraction diagnostics must include only safe metadata (provider, model, status code, retryability, safe message, user action).
+- Diagnostics/logs must never include API keys, Authorization headers, full raw provider payloads, or full document text.
+- `provider_unavailable` must be used only as a safe fallback when failures cannot be reliably classified.
