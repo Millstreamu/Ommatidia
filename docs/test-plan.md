@@ -145,7 +145,7 @@ This test plan defines acceptance criteria and validation strategy for existing 
 | Invalid AI responses not saved | Covered by unit test |
 | missing_api_key error | Covered by unit test |
 | request_timeout error | Covered by unit test |
-| retryable rate limit/provider failure | Missing (needs provider fault-injection harness) |
+| retryable rate limit/provider failure | Covered by extraction unit tests with provider stubs |
 | Failed extraction attempts tracked | Covered by API test |
 | UI friendly extraction errors | Manual only |
 | Report includes approved values | Covered by unit test + API test |
@@ -195,3 +195,6 @@ Package-focused (optional):
 6. Report failures honestly and document any justified temporary gaps in **Known gaps**.
 
 - [x] Task 16: OpenAI extraction zero-value diagnostics visible in API/UI attempts; warnings required when valuesCreatedCount=0.
+
+
+- [x] Task 16A: OpenAI extraction failures classify auth/permission/rate/timeout/model/bad-request/network errors and expose only safe diagnostics in API logs/UI.
