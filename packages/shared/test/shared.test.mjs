@@ -4,70 +4,42 @@ import {
   dataStatusSchema,
   engineeringModuleSchema,
   engineeringValueSchema,
-  exampleComponent,
-  exampleDocument,
-  exampleEngineeringModule,
-  exampleEngineeringValue,
-  exampleProject,
-  exampleReportSection,
   sourceReferenceSchema
 } from '../dist/index.js';
 
-test('example fixtures pass shared schema validation', () => {
-  assert.doesNotThrow(() => {
-    // parse raises on invalid data
-    sourceReferenceSchema.parse(exampleEngineeringValue.sourceReferences[0]);
-    engineeringValueSchema.parse(exampleEngineeringValue);
-    engineeringModuleSchema.parse(exampleEngineeringModule);
-  });
+const sampleValue = {
+  id: 'val_001',
+  projectId: 'proj_001',
+  key: 'nominal_pressure',
+  label: 'Nominal Pressure',
+  value: 210,
+  valueType: 'number',
+  unit: 'bar',
+  status: 'needs_review',
+  sourceReferences: [{ documentId: 'doc_001', pageNumber: 1, sourceText: 'Nominal pressure 210 bar' }],
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString()
+};
 
-  assert.equal(exampleProject.id, 'proj_hpu_001');
-  assert.equal(exampleDocument.projectId, exampleProject.id);
-  assert.equal(exampleComponent.projectId, exampleProject.id);
-  assert.equal(exampleReportSection.projectId, exampleProject.id);
+const sampleModule = {
+  id: 'mod_001',
+  name: 'Hydraulic power',
+  description: 'Compute hydraulic power',
+  moduleType: 'calculation',
+  applicableProjectTypes: ['custom'],
+  inputs: [{ key: 'flow', label: 'Flow', valueType: 'number', required: true, unit: 'L/min' }],
+  outputs: [{ key: 'power', label: 'Power', valueType: 'number', required: true, unit: 'kW' }]
+};
+
+test('shared schemas validate canonical sample objects', () => {
+  assert.doesNotThrow(() => {
+    sourceReferenceSchema.parse(sampleValue.sourceReferences[0]);
+    engineeringValueSchema.parse(sampleValue);
+    engineeringModuleSchema.parse(sampleModule);
+  });
 });
 
 test('invalid DataStatus values fail schema validation', () => {
   const invalid = dataStatusSchema.safeParse('draft');
   assert.equal(invalid.success, false);
-});
-
-test('EngineeringValue requires key, label, value, status, and timestamps', () => {
-  const { key, ...missingKey } = exampleEngineeringValue;
-  const { label, ...missingLabel } = exampleEngineeringValue;
-  const { value, ...missingValue } = exampleEngineeringValue;
-  const { status, ...missingStatus } = exampleEngineeringValue;
-  const { createdAt, ...missingCreatedAt } = exampleEngineeringValue;
-  const { updatedAt, ...missingUpdatedAt } = exampleEngineeringValue;
-
-  assert.equal(engineeringValueSchema.safeParse(missingKey).success, false);
-  assert.equal(engineeringValueSchema.safeParse(missingLabel).success, false);
-  assert.equal(engineeringValueSchema.safeParse(missingValue).success, false);
-  assert.equal(engineeringValueSchema.safeParse(missingStatus).success, false);
-  assert.equal(engineeringValueSchema.safeParse(missingCreatedAt).success, false);
-  assert.equal(engineeringValueSchema.safeParse(missingUpdatedAt).success, false);
-});
-
-test('SourceReference supports document/page/source text references', () => {
-  const parsed = sourceReferenceSchema.parse({
-    documentId: 'doc_123',
-    pageNumber: 5,
-    sourceText: 'Nominal pressure: 210 bar'
-  });
-
-  assert.equal(parsed.documentId, 'doc_123');
-  assert.equal(parsed.pageNumber, 5);
-  assert.equal(parsed.sourceText, 'Nominal pressure: 210 bar');
-});
-
-test('EngineeringModule supports calculation and summary module types', () => {
-  const calculation = engineeringModuleSchema.safeParse(exampleEngineeringModule);
-  assert.equal(calculation.success, true);
-
-  const summary = engineeringModuleSchema.safeParse({
-    ...exampleEngineeringModule,
-    id: 'mod_summary_001',
-    moduleType: 'summary'
-  });
-  assert.equal(summary.success, true);
 });

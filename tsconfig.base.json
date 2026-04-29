@@ -12,6 +12,7 @@
     "skipLibCheck": true,
     "composite": true,
     "noEmitOnError": true,
+    "types": [],
     "baseUrl": ".",
     "paths": {
       "@ommatidia/shared": ["packages/shared/src/index.ts"],
