@@ -57,3 +57,5 @@
 - Extraction must not send PDF internals (font tables, encoding metadata, object/xref/trailer stream content) as if they were visible engineering evidence.
 - If PDF text diagnostics indicate mostly internal/metadata text, extraction must stop before OpenAI candidate extraction and return a clear warning that useful visible text was not produced.
 - When text extraction fails, AI must not invent engineering values and must explicitly recommend OCR/vision extraction.
+
+- Extraction previews must be sanitized and capped (1000 chars max) and must not expose full document text or secrets in UI/logs by default.

@@ -255,8 +255,14 @@ test('UI renders concise dropped-candidate warnings', () => {
   assert.match(text, /Dropped ‘rated pressure’: value is required\./);
 });
 test('UI renders concise extraction diagnostics and warning', () => {
-  const text = renderExtractionDiagnostics({ warnings: ['PDF text extraction did not produce useful visible text.'], diagnostics: { contentSentToModel: false, pdfTextExtraction: { extractedCharacterCount: 200, usefulTextCharacterCount: 10 } } });
+  const text = renderExtractionDiagnostics({ warnings: ['PDF text extraction produced mostly internal PDF structure rather than visible text.'], diagnostics: { contentSentToModel: false, pdfTextExtraction: { extractedCharacterCount: 200, usefulTextCharacterCount: 10, suspiciousInternalTextRatio: 0.8 } } });
   assert.match(text, /Text extracted: yes/);
   assert.match(text, /useful chars: 10/);
   assert.match(text, /OpenAI called: no/);
+});
+
+
+test('UI diagnostics includes suspicious ratio and preview label', () => {
+  const text = renderExtractionDiagnostics({ warnings: [], diagnostics: { contentSentToModel: true, pdfTextExtraction: { extractedCharacterCount: 300, usefulTextCharacterCount: 200, suspiciousInternalTextRatio: 0.25 } } });
+  assert.match(text, /suspicious\/internal ratio: 0.25/);
 });

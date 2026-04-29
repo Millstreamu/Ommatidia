@@ -204,3 +204,6 @@ EXTRACTION_PROVIDER=mock npm run start --workspace @ommatidia/api
   - `OCR or vision extraction is required for this document.`
 - The API/UI diagnostics now expose extracted text character count and useful text character count to help confirm whether a text-readable PDF was parsed correctly.
 - This avoids sending bad PDF internals to OpenAI as evidence and avoids unrelated guessed values.
+
+## Troubleshooting
+- If OpenAI reports the file looks like PDF metadata/internal structure, use extraction attempt debug details and extracted text preview to verify what text is sent.

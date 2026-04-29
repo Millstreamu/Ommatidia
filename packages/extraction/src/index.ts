@@ -10,7 +10,7 @@ export interface ExtractionErrorResponse { errorCode: ExtractionErrorCode; messa
 export class ExtractionError extends Error { constructor(public readonly payload: ExtractionErrorResponse) { super(payload.message); } }
 export interface ExtractEngineeringValuesInput { projectId: string; documentId: string; document: Document; documentFilePath: string; extractionTarget?: { componentType?: string; moduleType?: string }; }
 export interface DroppedCandidateDiagnostic { candidateIdentifier?: string; reasonCode: 'missing_value' | 'invalid_value_type' | 'invalid_source_references' | 'schema_validation_failed'; validationIssuePaths: string[]; validationIssueMessages: string[]; missingRequiredFields: boolean; }
-export interface ExtractionDiagnostics { documentFilename: string; documentMimeType: string; contentRead: boolean; contentSentToModel: boolean; rawCandidateCount: number; invalidCandidateCount: number; skippedApprovedConflictCount: number; droppedCandidates?: DroppedCandidateDiagnostic[]; pdfTextExtraction?: PdfExtractionDiagnostics; }
+export interface ExtractionDiagnostics { documentFilename: string; documentMimeType: string; contentRead: boolean; contentSentToModel: boolean; rawCandidateCount: number; invalidCandidateCount: number; skippedApprovedConflictCount: number; droppedCandidates?: DroppedCandidateDiagnostic[]; pdfTextExtraction?: PdfExtractionDiagnostics; pdfTextPreview?: string; }
 export interface PdfExtractionDiagnostics { pageCount?: number; extractedCharacterCount: number; usefulTextCharacterCount: number; suspiciousInternalTextRatio: number; fallbackUsed: boolean; looksLikePdfInternals: boolean; }
 export interface PdfExtractionResult { pages: Array<{ pageNumber: number; text: string }>; combinedText: string; diagnostics: PdfExtractionDiagnostics; }
 export interface ExtractEngineeringValuesResult { candidateValues: EngineeringValue[]; missingInformation: string[]; warnings: string[]; providerMetadata?: { provider: 'mock' | 'openai'; model?: string }; diagnostics?: ExtractionDiagnostics; }
@@ -136,11 +136,21 @@ function normalizeCandidate(raw: Record<string, unknown>, input: ExtractEngineer
   }
   return candidate;
 }
+const PDF_INTERNAL_PATTERN = /(?:\bobj\b|\bendobj\b|\bstream\b|\bendstream\b|\bxref\b|\btrailer\b|\/Font\b|\/Encoding\b|\/Type\b|\/Subtype\b|\/Length\b|\/Filter\b|\/FlateDecode\b|\/CIDFont\b|\/ToUnicode\b|\/Resources\b|\bbeginbfchar\b|\bendbfchar\b|\/BaseFont\b|\d+\s+\d+\s+R\b)/gi;
+const ENGINEERING_SIGNAL_PATTERN = /(?:\bmodel\b|\bproduct\b|\bspecification\b|\bpressure\b|\bflow\b|\bdisplacement\b|\brpm\b|\bspeed\b|\btorque\b|\bpower\b|\bkw\b|\bbar\b|\bpsi\b|\bcc\/rev\b|\bl\/min\b|\bport\b|\binlet\b|\boutlet\b|\bflange\b|\bshaft\b|\brotation\b|\bweight\b|\bdimension\b|\blength\b|\bwidth\b|\bheight\b|\btemperature\b)/gi;
+function sanitizePreview(text: string): string {
+  const compact = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ').replace(/\s+/g, ' ').trim();
+  return compact
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [REDACTED]')
+    .replace(/sk-[A-Za-z0-9_-]+/g, 'sk-[REDACTED]')
+    .slice(0, 1000);
+}
 function scoreInternalPdfText(text: string): number {
-  const internalHits = (text.match(/(?:\/Font|\/Encoding|\bobj\b|\bendobj\b|\bxref\b|\bstream\b|\bendstream\b|\btrailer\b|<\?xpacket|<rdf:RDF|\/BaseFont)/gi) ?? []).length;
-  const englishTokens = (text.match(/[A-Za-z]{3,}/g) ?? []).length;
-  const denominator = Math.max(1, englishTokens + internalHits);
-  return internalHits / denominator;
+  const internalHits = (text.match(PDF_INTERNAL_PATTERN) ?? []).length;
+  const controlChars = (text.match(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g) ?? []).length;
+  const engineeringHits = (text.match(ENGINEERING_SIGNAL_PATTERN) ?? []).length;
+  const denom = Math.max(1, internalHits + engineeringHits + Math.floor(controlChars / 2));
+  return (internalHits + Math.floor(controlChars / 2)) / denom;
 }
 function decodePdfString(value: string): string {
   return value.replace(/\\\)/g, ')').replace(/\\\(/g, '(').replace(/\\n/g, '\n').replace(/\\r/g, '\r').replace(/\\t/g, '\t').replace(/\\\\/g, '\\');
@@ -173,7 +183,7 @@ function extractPdfVisibleText(buffer: Uint8Array): PdfExtractionResult {
   }
   const combinedText = pages.map((p) => `[Page ${p.pageNumber}]\n${p.text}`).join('\n\n');
   const usefulText = combinedText
-    .replace(/(?:\/Font|\/Encoding|\bobj\b|\bendobj\b|\bxref\b|\bstream\b|\bendstream\b|\btrailer\b|<\?xpacket|<rdf:RDF|\/BaseFont)/gi, '')
+    .replace(PDF_INTERNAL_PATTERN, '')
     .replace(/\s+/g, ' ')
     .trim();
   const suspiciousInternalTextRatio = scoreInternalPdfText(combinedText);
@@ -245,13 +255,15 @@ export class OpenAiExtractionService implements ExtractionService {
     const pdfExtraction = input.document.mimeType === 'application/pdf' ? extractPdfVisibleText(fileBytes) : undefined;
     const parsedText = pdfExtraction?.combinedText ?? '';
     const textWasParsed = parsedText.trim().length > 0;
-    if (input.document.mimeType === 'application/pdf' && (!textWasParsed || pdfExtraction?.diagnostics.looksLikePdfInternals)) {
+    const preview = sanitizePreview(parsedText);
+    const deterministicCandidates: EngineeringValue[] = textWasParsed ? this.extractDeterministicCandidates(parsedText, input) : [];
+    if (input.document.mimeType === 'application/pdf' && (!textWasParsed || pdfExtraction?.diagnostics.looksLikePdfInternals || (pdfExtraction?.diagnostics.suspiciousInternalTextRatio ?? 0) >= 0.5)) {
       return {
-        candidateValues: [],
+        candidateValues: deterministicCandidates,
         missingInformation: [],
-        warnings: ['PDF text extraction did not produce useful visible text.', 'OCR or vision extraction is required for this document.'],
+        warnings: ['PDF text extraction produced mostly internal PDF structure rather than visible text.', 'OCR/vision extraction or a better PDF parser is recommended.'],
         providerMetadata: { provider: 'openai', model: this.model },
-        diagnostics: { documentFilename: input.document.originalFilename, documentMimeType: input.document.mimeType, contentRead: true, contentSentToModel: false, rawCandidateCount: 0, invalidCandidateCount: 0, skippedApprovedConflictCount: 0, ...(pdfExtraction?.diagnostics ? { pdfTextExtraction: pdfExtraction.diagnostics } : {}) } as ExtractionDiagnostics
+        diagnostics: { documentFilename: input.document.originalFilename, documentMimeType: input.document.mimeType, contentRead: true, contentSentToModel: false, rawCandidateCount: deterministicCandidates.length, invalidCandidateCount: 0, skippedApprovedConflictCount: 0, pdfTextPreview: preview, ...(pdfExtraction?.diagnostics ? { pdfTextExtraction: pdfExtraction.diagnostics } : {}) } as ExtractionDiagnostics
       };
     }
     const prompt = `Extract engineering candidate values from this document only.
@@ -283,7 +295,7 @@ Rules:
     if (typeof parsed !== 'object' || parsed === null) throw toDiagnosticError('unsupported_response_shape', 'Model returned an unsupported response shape.', false, { model: this.model, userAction: 'Retry extraction; if it repeats, adjust extraction configuration.' });
     if (!Array.isArray(parsed.candidateValues) || !Array.isArray(parsed.missingInformation) || !Array.isArray(parsed.warnings)) throw toDiagnosticError('schema_invalid_response', 'Model response failed schema checks.', false, { model: this.model, userAction: 'Retry extraction; if it repeats, adjust extraction configuration.' });
 
-    const now = new Date().toISOString(); const candidateValues: EngineeringValue[] = []; let invalidCandidateCount = 0; const droppedCandidates: DroppedCandidateDiagnostic[] = [];
+    const now = new Date().toISOString(); const candidateValues: EngineeringValue[] = [...deterministicCandidates]; let invalidCandidateCount = 0; const droppedCandidates: DroppedCandidateDiagnostic[] = [];
     for (let index = 0; index < parsed.candidateValues.length; index += 1) {
       const v = parsed.candidateValues[index];
       const normalized = normalizeCandidate(v, input, index, now);
@@ -292,7 +304,26 @@ Rules:
     const warnings = [...parsed.warnings];
     if (candidateValues.length === 0) warnings.push('No engineering values were extracted from this document.');
     if (invalidCandidateCount > 0) warnings.push(...formatDroppedWarnings(droppedCandidates));
-    return { candidateValues, missingInformation: parsed.missingInformation, warnings, providerMetadata: { provider: 'openai', model: this.model }, diagnostics: { documentFilename: input.document.originalFilename, documentMimeType: input.document.mimeType, contentRead: true, contentSentToModel: true, rawCandidateCount: parsed.candidateValues.length, invalidCandidateCount, skippedApprovedConflictCount: 0, droppedCandidates, ...(pdfExtraction?.diagnostics ? { pdfTextExtraction: pdfExtraction.diagnostics } : {}) } as ExtractionDiagnostics };
+    return { candidateValues, missingInformation: parsed.missingInformation, warnings, providerMetadata: { provider: 'openai', model: this.model }, diagnostics: { documentFilename: input.document.originalFilename, documentMimeType: input.document.mimeType, contentRead: true, contentSentToModel: true, rawCandidateCount: parsed.candidateValues.length + deterministicCandidates.length, invalidCandidateCount, skippedApprovedConflictCount: 0, droppedCandidates, pdfTextPreview: preview, ...(pdfExtraction?.diagnostics ? { pdfTextExtraction: pdfExtraction.diagnostics } : {}) } as ExtractionDiagnostics };
+  }
+
+  private extractDeterministicCandidates(text: string, input: ExtractEngineeringValuesInput): EngineeringValue[] {
+    const now = new Date().toISOString();
+    const defs: Array<[string, string, RegExp, (m: RegExpMatchArray) => { value: string|number; unit?: string }]> = [
+      ['model_code', 'Model code', /model(?:\s*code)?[:\s]+([A-Za-z0-9-]+)/i, (m) => ({ value: m[1] })],
+      ['displacement', 'Displacement', /displacement[:\s]+([\d.]+)\s*(cc\/rev)/i, (m) => ({ value: Number(m[1]), unit: m[2] })],
+      ['pressure_compensator_setting', 'Pressure compensator setting', /pressure compensator setting[:\s]+([\d.]+)\s*(bar|psi)/i, (m) => ({ value: Number(m[1]), unit: m[2] })],
+      ['load_sensing_setting', 'Load sensing setting', /load sensing setting[:\s]+([\d.]+)\s*(bar|psi)/i, (m) => ({ value: Number(m[1]), unit: m[2] })],
+      ['rotation', 'Rotation', /(clockwise|counterclockwise)\s+rotation|rotation[:\s]+(clockwise|counterclockwise)/i, (m) => ({ value: (m[1] ?? m[2]).toLowerCase() })]
+    ];
+    const out: EngineeringValue[] = [];
+    for (const [key, label, pattern, mapper] of defs) {
+      const match = text.match(pattern);
+      if (!match) continue;
+      const mapped = mapper(match);
+      out.push(engineeringValueSchema.parse({ id: `det-${input.documentId}-${key}`, projectId: input.projectId, documentId: input.documentId, key, label, value: mapped.value, valueType: typeof mapped.value === 'number' ? 'number' : 'string', unit: mapped.unit, status: 'needs_review', sourceReferences: [{ documentId: input.documentId, sourceText: sanitizePreview(match[0]) }], confidence: 0.6, notes: 'Deterministic text candidate from visible extracted text.', createdAt: now, updatedAt: now }));
+    }
+    return out;
   }
 }
 
