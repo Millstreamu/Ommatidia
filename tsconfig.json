@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/shared" },
+    { "path": "./packages/calculations" },
+    { "path": "./packages/extraction" },
+    { "path": "./packages/reports" },
+    { "path": "./apps/api" },
+    { "path": "./apps/web" }
+  ]
+}
