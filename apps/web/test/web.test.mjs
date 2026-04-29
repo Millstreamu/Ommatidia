@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge } from '../dist/app.js';
+import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, resolveApiBaseUrl } from '../dist/app.js';
 import { startWebApp } from '../dist/index.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,6 +19,15 @@ async function withWebServer(fn) {
 test('engineering value form validates required fields', () => {
   const errors = validateEngineeringValueForm({ key: '', label: '', value: '', valueType: '' });
   assert.ok(errors.length >= 4);
+});
+
+test('resolveApiBaseUrl returns localhost default outside Codespaces', () => {
+  assert.equal(resolveApiBaseUrl('localhost'), 'http://127.0.0.1:3001');
+});
+
+test('resolveApiBaseUrl maps Codespaces port 3000 host to 3001 host', () => {
+  const host = 'friendly-space-abc123-3000.app.github.dev';
+  assert.equal(resolveApiBaseUrl(host), 'https://friendly-space-abc123-3001.app.github.dev');
 });
 
 test('project empty state and list rendering', () => {
@@ -78,12 +87,13 @@ test('Word export button helper calls API and handles file response', async () =
 });
 
 
-test('web root serves app shell with projects heading and API 3001 default', async () => {
+test('web root serves app shell with mount script and fallback error UI', async () => {
   await withWebServer(async (base) => {
     const res = await fetch(base + '/');
     assert.equal(res.status, 200);
     const html = await res.text();
     assert.match(html, /mountApp/);
-    assert.match(html, /127\.0\.0\.1:3001/);
+    assert.match(html, /Application failed to load/);
+    assert.match(html, /resolveApiBaseUrl/);
   });
 });
