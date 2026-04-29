@@ -1,4 +1,5 @@
 declare const process: { env: Record<string,string|undefined> };
+import { readFile } from 'node:fs/promises';
 import { engineeringValueSchema, type Document, type EngineeringValue } from '@ommatidia/shared';
 
 export type ExtractionErrorCode =
@@ -85,6 +86,32 @@ function inferValueType(value: unknown): 'number'|'string'|'boolean'|'list'|'tab
   if (Array.isArray(value)) return value.every((item) => typeof item === 'object' && item !== null && !Array.isArray(item)) ? 'table' : 'list';
   return 'string';
 }
+function normalizeSourceReferences(rawCandidate: Record<string, unknown>, documentId: string): { normalized: unknown[]; removedCount: number } {
+  const sourceReferences = rawCandidate.sourceReferences ?? rawCandidate.sourceReference ?? [];
+  const sourceReferenceItems = typeof sourceReferences === 'string'
+    ? [{ documentId, sourceText: sourceReferences }]
+    : Array.isArray(sourceReferences)
+      ? sourceReferences
+      : sourceReferences && typeof sourceReferences === 'object'
+        ? [sourceReferences]
+        : [];
+  const normalized: unknown[] = [];
+  let removedCount = 0;
+  for (const item of sourceReferenceItems) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      removedCount += 1;
+      continue;
+    }
+    const reference = { ...(item as Record<string, unknown>) };
+    if (typeof reference.documentId !== 'string' || !reference.documentId.trim()) reference.documentId = documentId;
+    if (typeof reference.documentId !== 'string' || !reference.documentId.trim()) {
+      removedCount += 1;
+      continue;
+    }
+    normalized.push(reference);
+  }
+  return { normalized, removedCount };
+}
 function normalizeCandidate(raw: Record<string, unknown>, input: ExtractEngineeringValuesInput, index: number, now: string): Record<string, unknown> {
   const notes: string[] = [];
   const candidate = { ...raw };
@@ -95,7 +122,10 @@ function normalizeCandidate(raw: Record<string, unknown>, input: ExtractEngineer
   if (typeof raw.status !== 'string') notes.push('status defaulted to needs_review');
   if (typeof candidate.createdAt !== 'string' || !candidate.createdAt.trim()) { candidate.createdAt = now; notes.push('createdAt added'); }
   if (typeof candidate.updatedAt !== 'string' || !candidate.updatedAt.trim()) { candidate.updatedAt = now; notes.push('updatedAt added'); }
-  if (!Array.isArray(candidate.sourceReferences)) { candidate.sourceReferences = []; notes.push('sourceReferences defaulted to empty array'); }
+  const sourceRefResult = normalizeSourceReferences(candidate, input.documentId);
+  candidate.sourceReferences = sourceRefResult.normalized;
+  if (!('sourceReferences' in raw) && !('sourceReference' in raw)) notes.push('sourceReferences defaulted to empty array');
+  if (sourceRefResult.removedCount > 0) notes.push(`removed ${sourceRefResult.removedCount} invalid source reference item(s)`);
   if ((typeof candidate.key !== 'string' || !candidate.key.trim()) && typeof candidate.label === 'string' && candidate.label.trim()) { candidate.key = toSafeKey(candidate.label); notes.push('key generated from label'); }
   if (typeof candidate.valueType !== 'string' || !candidate.valueType.trim()) { candidate.valueType = inferValueType(candidate.value); notes.push(`valueType inferred as ${candidate.valueType}`); }
   if (notes.length) {
@@ -103,6 +133,12 @@ function normalizeCandidate(raw: Record<string, unknown>, input: ExtractEngineer
     candidate.notes = `${existing}Normalization: ${notes.join('; ')}`;
   }
   return candidate;
+}
+function extractLikelyTextFromPdfContent(buffer: Uint8Array): string {
+  const raw = Buffer.from(buffer).toString('latin1');
+  const matches = raw.match(/[A-Za-z0-9][A-Za-z0-9\s,.:;()/_+\-%]{8,}/g) ?? [];
+  const unique = Array.from(new Set(matches.map((line: string) => line.replace(/\s+/g, ' ').trim()).filter((line: string) => line.length > 10)));
+  return unique.slice(0, 2500).join('\n');
 }
 function formatDroppedWarnings(dropped: DroppedCandidateDiagnostic[]): string[] {
   const grouped = new Map<string, number>();
@@ -163,12 +199,36 @@ export class OpenAiExtractionService implements ExtractionService {
 
   async extractEngineeringValues(input: ExtractEngineeringValuesInput): Promise<ExtractEngineeringValuesResult> {
     if (!SUPPORTED_MIME.has(input.document.mimeType)) throw new ExtractionError(normalizedExtractionError('unsupported_file_type', 'Unsupported file type for OpenAI extraction.', false));
-    const encodedDocument = (input.documentFilePath ?? '').trim();
-    if (!encodedDocument) throw new ExtractionError(normalizedExtractionError('no_document_content', 'No document content was sent to the model.', false, { details: { model: this.model, documentContentIncluded: false, usedFileInput: false } }));
-    const prompt = `Extract engineering candidate values from this document. Return strict JSON with keys candidateValues (array), missingInformation (array of strings), warnings (array of strings). For each candidate value include simple fields only: key, label, value, valueType, unit, confidence, notes, sourceReferences. valueType should be one of: number, string, boolean, list, table. sourceReferences must be an array when present. Do not include system metadata fields like id, projectId, documentId, createdAt, updatedAt; the application will add those. Preserve units from source. Do not invent missing values. Use statuses needs_review or ai_extracted only if you include status.`;
+    const filePath = (input.documentFilePath ?? '').trim();
+    if (!filePath) throw new ExtractionError(normalizedExtractionError('no_document_content', 'No document content was sent to the model.', false, { details: { model: this.model, documentContentIncluded: false, usedFileInput: false } }));
+    const fileBytes = await readFile(filePath);
+    const parsedText = input.document.mimeType === 'application/pdf' ? extractLikelyTextFromPdfContent(fileBytes) : '';
+    const textWasParsed = parsedText.trim().length > 0;
+    if (!textWasParsed && input.document.mimeType === 'application/pdf') {
+      return {
+        candidateValues: [],
+        missingInformation: [],
+        warnings: ['No selectable text was found. OCR or vision extraction is required for this document.'],
+        providerMetadata: { provider: 'openai', model: this.model },
+        diagnostics: { documentFilename: input.document.originalFilename, documentMimeType: input.document.mimeType, contentRead: true, contentSentToModel: false, rawCandidateCount: 0, invalidCandidateCount: 0, skippedApprovedConflictCount: 0 }
+      };
+    }
+    const prompt = `Extract engineering candidate values from this document only.
+Document filename: ${input.document.originalFilename}
+Document type: ${input.document.documentType}
+Component context: ${input.extractionTarget?.componentType ?? 'not provided'}
+Rules:
+- Extract only values explicitly present in this document.
+- Do not invent values.
+- Avoid material-property fields unless they are present in this document.
+- Preserve source units.
+- Return strict JSON with keys candidateValues (array), missingInformation (array of strings), warnings (array of strings).
+- Candidate fields: key, label, value, valueType, unit, confidence, notes, sourceReferences.
+- sourceReferences may include pageNumber, sectionTitle, sourceText; never fabricate.
+- Use status only as needs_review or ai_extracted if provided.`;
     let parsed: { candidateValues: Array<Record<string, unknown>>; missingInformation: string[]; warnings: string[] };
     try {
-      const response = await this.client.responses.create({ model: this.model, input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }, { type: 'input_text', text: `Document server path: ${encodedDocument}` }] }], text: { format: { type: 'json_object' } } });
+      const response = await this.client.responses.create({ model: this.model, input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }, { type: 'input_text', text: `Document text content follows:\n${parsedText}` }] }], text: { format: { type: 'json_object' } } });
       const responseText = this.getResponseText(response);
       if (!responseText) {
         throw new ExtractionError(normalizedExtractionError('invalid_model_response', 'Model returned empty output.', false, { userAction: 'Retry extraction or adjust prompt/model configuration.', details: this.buildSafeDiagnostics(response, true, false) }));

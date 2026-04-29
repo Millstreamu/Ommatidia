@@ -65,3 +65,15 @@ Report sections can now be exported deterministically as `.docx` files via the A
 The API now includes an in-memory reusable component library for promoting approved/user-entered component values, listing/searching, copying into projects, and compare-only diff operations.
 
 - OpenAI extraction now reads uploaded PDF/image bytes and sends them to the model as file input; if unreadable, API returns explicit warning/error instead of silent zero-value success. OCR is not implemented, so image-only/scanned PDFs may still return no values.
+
+### Text-readable PDF extraction path
+
+- API resolves the selected document metadata and file path for each extraction attempt (`documentId` scoped).
+- Extraction reads bytes from that specific stored file, derives text for text-readable PDFs, and sends only that document context to OpenAI along with filename/document-type metadata.
+- Candidate normalization runs before schema validation so system metadata and source reference shapes are safely normalized.
+
+### Image-only / no-selectable-text limitation
+
+- If PDF text parsing yields no selectable content, extraction stops before model extraction and returns a deterministic warning:
+  - `No selectable text was found. OCR or vision extraction is required for this document.`
+- This prevents unrelated candidates from being produced when OCR/vision is not available.

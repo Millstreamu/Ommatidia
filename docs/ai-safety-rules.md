@@ -45,3 +45,9 @@
 - Candidate normalization may fill system metadata (`id`, `projectId`, `documentId`, timestamps, default `status`, inferred `valueType`, normalized `sourceReferences`) before shared schema validation.
 - Normalization must not invent engineering facts or missing engineering values; it only reshapes candidate structure.
 - Invalid candidates must remain visible through safe dropped-candidate diagnostics and concise user-facing warnings.
+
+## Document-content routing and source reference safety (Task 16D)
+
+- Source references may be normalized from legacy forms (`sourceReference`, string/object `sourceReferences`) into schema-safe `sourceReferences[]`.
+- Normalization must never invent engineering values; it may only reshape candidate metadata and retain/drop invalid reference items safely.
+- No-text/image-only documents must not produce unrelated guessed candidates; extraction must return a clear OCR/vision-required warning.

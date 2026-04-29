@@ -191,3 +191,13 @@ EXTRACTION_PROVIDER=mock npm run start --workspace @ommatidia/api
 - Check attempt warnings/diagnostics in the UI (provider, content read/sent, skipped conflicts).
 - Common causes: scanned/image-only PDF without OCR, no supported engineering fields, schema-invalid model candidates dropped, or approved-value conflicts skipped.
 - Re-upload a text-readable datasheet/manual and retry.
+
+### Troubleshooting: `Invalid field: sourceReferences`
+- The extraction layer now normalizes legacy/source-variant shapes (`sourceReference`, string, object, mixed arrays) into `sourceReferences[]` before shared-schema validation.
+- Invalid reference entries are dropped item-by-item without dropping otherwise valid candidate values.
+- If references are missing entirely, `sourceReferences` defaults to `[]`.
+
+### Troubleshooting: Image-only PDF needs OCR/vision extraction
+- If a PDF has no selectable text, extraction returns:
+  - `No selectable text was found. OCR or vision extraction is required for this document.`
+- This avoids unrelated guessed values from non-document context.

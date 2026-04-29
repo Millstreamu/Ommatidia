@@ -48,6 +48,9 @@ This test plan defines acceptance criteria and validation strategy for existing 
 - [ ] Invalid AI responses are not saved.
 - [ ] Model candidates missing system metadata are normalized safely before validation/save.
 - [ ] Dropped candidates show safe, specific reasons in API/UI warnings.
+- [ ] Source-reference variants normalize safely without dropping valid candidates.
+- [ ] Extraction uses only selected document content per attempt (no stale payload reuse).
+- [ ] Image-only/no-text PDFs return clear OCR/vision warning and avoid unrelated guesses.
 
 ### Extraction provider switching
 - [ ] User can switch extraction provider between mock and OpenAI from header controls.
@@ -145,6 +148,9 @@ This test plan defines acceptance criteria and validation strategy for existing 
 | Approved values not overwritten on rerun | Covered by API test |
 | Missing extraction file error | Covered by API test |
 | Invalid AI responses not saved | Covered by unit test |
+| Source-reference variants normalize safely without dropping valid candidates | Covered by extraction unit test |
+| Extraction uses only selected document content per attempt (no stale payload reuse) | Covered by extraction unit test |
+| Image-only/no-text PDFs return OCR/vision-required warning and avoid unrelated guesses | Covered by extraction unit test |
 | missing_api_key error | Covered by unit test |
 | request_timeout error | Covered by unit test |
 | retryable rate limit/provider failure | Covered by extraction unit tests with provider stubs |
