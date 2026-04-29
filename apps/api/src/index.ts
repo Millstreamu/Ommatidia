@@ -70,5 +70,5 @@ if(method==='POST'&&pathname==='/report-sections/export-docx'){ const input = re
 if(pathname.startsWith('/report-sections/')){ const id=pathname.split('/')[2]; const existing=id?reportSections.getById(id):undefined; if(!existing) return sendJson(res,404,{error:'Report section not found'}); if(method==='GET') return sendJson(res,200,existing); if(method==='PATCH'){ const updates = reportSectionUpdateSchema.parse(await readBody(req)); const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() } as ReportSection; reportSections.update(id, updated); return sendJson(res,200,updated); } if(method==='DELETE'){ reportSections.delete(id); return sendJson(res,200,{deleted:true}); }}
 return sendJson(res,404,{error:'Not found'});
 } catch(error){ if(error instanceof ZodError) return sendJson(res,400,{error:'Validation failed',details:error.issues}); if(error instanceof Error) return sendJson(res,400,{error:error.message}); return sendJson(res,500,{error:'Unknown error'}); }}; }
-export function startApiServer(port=3000){ const server=createServer(createApiHandler()); server.listen(port); return server; }
+export function startApiServer(port=3001){ const server=createServer(createApiHandler()); server.listen(port); return server; }
 if(process.argv[1]&&import.meta.url===new URL(`file://${process.argv[1]}`).href){ startApiServer(); }

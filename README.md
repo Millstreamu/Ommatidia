@@ -46,7 +46,7 @@ test -n "$OPENAI_API_KEY" && echo "OPENAI_API_KEY is set" || echo "OPENAI_API_KE
 Notes:
 - `setup` installs dependencies, creates `.env` from `.env.example` only when `.env` is missing, and prepares `storage/uploads/`.
 - `start` launches API and web together for local development.
-- Default local URLs: API `http://localhost:3001`, Web `http://localhost:3000`.
+- Default local URLs: API `http://localhost:3001`, Web `http://localhost:3000` (opening this URL shows the Projects page by default).
 - `reset-local` deletes local development uploads in `storage/uploads` and recreates the folder; it does not delete `.env`.
 - In GitHub Codespaces, `OPENAI_API_KEY` can be provided via Codespaces/repository secrets or environment variables.
 - The default extraction provider is `mock`, so real OpenAI credentials are not required for basic local startup.
