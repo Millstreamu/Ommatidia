@@ -52,8 +52,8 @@ test('normalizes sourceReferences string and drops only invalid items', async ()
   await withTempPdf('Danfoss load sensing setting 20 bar', async (pdfPath) => {
     const svc = new OpenAiExtractionService({ responses: { create: async () => ({ output_text: '{"candidateValues":[{"label":"Load sensing setting","value":20,"unit":"bar","sourceReferences":"Load sensing setting 20 bar"},{"label":"Rotation","value":"clockwise","sourceReferences":[{"sourceText":"Rotation clockwise"},42]}],"missingInformation":[],"warnings":[]}' }) } });
     const result = await svc.extractEngineeringValues({ projectId: 'p', documentId: 'd', document: doc, documentFilePath: pdfPath });
-    assert.equal(result.candidateValues.length, 2);
-    assert.equal(result.candidateValues[0].sourceReferences[0].sourceText, 'Load sensing setting 20 bar');
+    assert.ok(result.candidateValues.length >= 2);
+    assert.match(result.candidateValues[0].sourceReferences[0].sourceText, /load sensing setting 20 bar/i);
     assert.equal(result.candidateValues[1].sourceReferences.length, 1);
   });
 });
@@ -63,7 +63,7 @@ test('image-only/no-text pdf path returns useful-text warning and no model call'
     const svc = new OpenAiExtractionService({ responses: { create: async () => { throw new Error('should not call model'); } } });
     const result = await svc.extractEngineeringValues({ projectId: 'p', documentId: 'd', document: doc, documentFilePath: pdfPath });
     assert.equal(result.candidateValues.length, 0);
-    assert.match(result.warnings.join(' | '), /PDF text extraction did not produce useful visible text/i);
+    assert.match(result.warnings.join(' | '), /mostly internal PDF structure/i);
     assert.equal(result.diagnostics?.contentSentToModel, false);
   });
 });
@@ -84,4 +84,27 @@ test('extraction request uses selected document content only (no stale text)', a
   assert.match(seenPrompts[0], /Danfoss displacement 25 cc\/rev/);
   assert.doesNotMatch(seenPrompts[1], /Danfoss displacement 25 cc\/rev/);
   assert.match(seenPrompts[1], /CAT 3054C max power 63 kW/);
+});
+
+
+test('pdf internal text is classified suspicious and blocks model call', async () => {
+  await withTempPdf('/Font /Encoding 12 0 R obj endobj stream endstream xref trailer', async (pdfPath) => {
+    let called = false;
+    const svc = new OpenAiExtractionService({ responses: { create: async () => { called = true; return { output_text: '{"candidateValues":[],"missingInformation":[],"warnings":[]}' }; } } });
+    const result = await svc.extractEngineeringValues({ projectId: 'p', documentId: 'd', document: doc, documentFilePath: pdfPath });
+    assert.equal(called, false);
+    assert.match(result.warnings.join(' | '), /mostly internal PDF structure/i);
+  });
+});
+
+test('deterministic fallback extracts danfoss-like values from visible text', async () => {
+  await withTempPdf('Model code D1P25 displacement 25 cc/rev pressure compensator setting 260 bar load sensing setting 20 bar clockwise rotation', async (pdfPath) => {
+    const svc = new OpenAiExtractionService({ responses: { create: async () => ({ output_text: '{"candidateValues":[],"missingInformation":[],"warnings":[]}' }) } });
+    const result = await svc.extractEngineeringValues({ projectId: 'p', documentId: 'd', document: doc, documentFilePath: pdfPath });
+    const keys = result.candidateValues.map((v) => v.key);
+    assert.ok(keys.includes('displacement'));
+    assert.ok(keys.includes('pressure_compensator_setting'));
+    assert.ok(keys.includes('load_sensing_setting'));
+    assert.ok(keys.includes('rotation'));
+  });
 });

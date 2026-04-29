@@ -77,3 +77,5 @@ The API now includes an in-memory reusable component library for promoting appro
 - If PDF text parsing yields no selectable content, extraction stops before model extraction and returns a deterministic warning:
   - `No selectable text was found. OCR or vision extraction is required for this document.`
 - This prevents unrelated candidates from being produced when OCR/vision is not available.
+
+- Added document text extraction diagnostics with suspicious/internal ratio and limited text previews for extraction attempts.
