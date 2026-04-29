@@ -51,3 +51,47 @@ test('promotion fails when no eligible values exist', async () => { await withSe
   const res = await fetch(`${base}/component-library/promote`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId:project.id, componentId:comp.id }) });
   assert.equal(res.status, 400);
 }); });
+
+
+test('full API workflow: project -> component -> approved value -> hydraulic calculation -> report -> docx export', async () => { await withServer(async (base) => {
+  const project = await createProject(base);
+  const component = await (await fetch(`${base}/components`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId:project.id, name:'Main Pump', type:'pump' }) })).json();
+  const approvedValue = await (await fetch(`${base}/engineering-values`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId:project.id, componentId:component.id, key:'flow_lpm', label:'Flow', value:120, valueType:'number', unit:'L/min', status:'approved', sourceReferences:[] }) })).json();
+  assert.equal(approvedValue.status, 'approved');
+  const calc = await (await fetch(`${base}/calculations/hydraulic-power-kw`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId: project.id, flowLpm:120, pressureBar:200, efficiency:0.85 }) })).json();
+  assert.equal(calc.outputs[0].key, 'hydraulic_power_kw');
+  const section = await (await fetch(`${base}/report-sections/generate`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId:project.id, sectionType:'calculation_summary', engineeringValues:[approvedValue] }) })).json();
+  assert.equal(section.projectId, project.id);
+  const docxRes = await fetch(`${base}/report-sections/export-docx`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId: project.id, reportSectionIds: [section.id] }) });
+  assert.equal(docxRes.status, 200);
+  const bytes = new Uint8Array(await docxRes.arrayBuffer());
+  assert.ok(bytes.length > 0);
+}); });
+
+test('extraction safety workflow keeps approved values on re-run', async () => { await withServer(async (base) => {
+  const project = await createProject(base);
+  const doc = await uploadDoc(base, project.id);
+  const firstExtraction = await fetch(`${base}/extractions`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ projectId: project.id, documentId: doc.id }) });
+  assert.equal(firstExtraction.status, 200);
+  const valuesAfterFirstRun = await (await fetch(`${base}/engineering-values?projectId=${project.id}`)).json();
+  assert.ok(valuesAfterFirstRun.length > 0);
+  assert.ok(valuesAfterFirstRun.every((v) => v.status === 'needs_review' || v.status === 'ai_extracted'));
+  const valueToApprove = valuesAfterFirstRun[0];
+  const approved = await (await fetch(`${base}/engineering-values/${valueToApprove.id}/status`, { method:'PATCH', headers:{'content-type':'application/json'}, body: JSON.stringify({ status: 'approved' }) })).json();
+  assert.equal(approved.status, 'approved');
+  const secondExtraction = await fetch(`${base}/extractions`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ projectId: project.id, documentId: doc.id }) });
+  assert.equal(secondExtraction.status, 200);
+  const valuesAfterSecondRun = await (await fetch(`${base}/engineering-values?projectId=${project.id}`)).json();
+  const approvedValues = valuesAfterSecondRun.filter((v) => v.id === valueToApprove.id);
+  assert.equal(approvedValues.length, 1);
+  assert.equal(approvedValues[0].status, 'approved');
+}); });
+
+test('report safety workflow includes approved values and excludes needs_review values', async () => { await withServer(async (base) => {
+  const project = await createProject(base);
+  const approved = await (await fetch(`${base}/engineering-values`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId:project.id, key:'pressure', label:'Pressure', value:180, valueType:'number', unit:'bar', status:'approved', sourceReferences:[] }) })).json();
+  const needsReview = await (await fetch(`${base}/engineering-values`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId:project.id, key:'draft_value', label:'Draft Value', value:999, valueType:'number', status:'needs_review', sourceReferences:[] }) })).json();
+  const generated = await (await fetch(`${base}/report-sections/generate`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ projectId:project.id, sectionType:'component_summary', engineeringValues:[approved, needsReview] }) })).json();
+  assert.match(generated.bodyMarkdown, /Pressure/);
+  assert.doesNotMatch(generated.bodyMarkdown, /Draft Value/);
+}); });

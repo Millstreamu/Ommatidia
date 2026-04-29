@@ -145,6 +145,10 @@ When adding schemas, add validation tests.
 When changing API routes, add route tests where practical.
 
 Before finishing a task, run the relevant tests and report what passed or failed.
+- When adding or changing features, update `docs/test-plan.md` acceptance criteria and coverage map.
+- Add or update automated tests for new/changed acceptance criteria where practical.
+- Run `npm run typecheck` and `npm run test` from repo root before completion.
+- Report failures honestly; do not claim passing status for unrun or failing checks.
 
 ## Code style
 

@@ -40,6 +40,17 @@ npm run lint
 npm run test
 ```
 
+## Testing
+
+See the full acceptance checklist and coverage map in [`docs/test-plan.md`](docs/test-plan.md).
+
+Core validation commands (run from repository root):
+
+```bash
+npm run typecheck
+npm run test
+```
+
 ## API commands
 
 Run from repository root:
