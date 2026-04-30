@@ -182,3 +182,136 @@ When reviewing code, check for:
 - API keys or secrets in client code
 - poor handling of missing data
 - unclear data statuses
+
+## Developer workflow
+
+The user is not an experienced coder and often works through GitHub Codespaces.
+
+- Prefer beginner-friendly commands and clear terminal output.
+- Use the standard workflow commands:
+  - `make setup` to prepare the repo
+  - `make update` to stop stale processes, pull, install/build/check, and print next steps
+  - `make start` to run local web/API services
+  - `make check` to run typecheck and tests
+- Task completion baseline: `npm run typecheck` and `npm run test` must pass.
+- After runtime UI/API changes, assume the user will run `make update`, `make start`, and open forwarded port `3000`.
+- Do not require users to manually patch code as part of normal workflows unless unavoidable.
+
+## UI/UX principles
+
+Build a clean engineering/admin dashboard experience, not a marketing page.
+
+Prefer:
+- clear headings and concise helper text
+- card-based sections and tables for engineering values
+- obvious buttons/forms and status badges
+- explicit loading, empty, success, and error states
+- expandable details for long diagnostics/previews
+
+Avoid:
+- long unstructured text dumps in main views
+- hidden failures or ambiguous extraction/provider status
+- controls that remain disabled after failed actions
+- requiring users to guess routes/ports
+- exposing secrets or raw API internals
+
+Important workflows must be visible and recoverable: failures should show friendly messages and re-enable controls.
+
+## App layout expectations
+
+Use a consistent app shell with a clear header (including extraction/OpenAI status where relevant), a project list page, and project detail workflow sections.
+
+Preferred project detail section order:
+1. Project overview
+2. Components
+3. Component data review
+4. Documents and extraction
+5. Extraction fixtures
+6. Component library
+7. Calculations
+8. Report sections
+
+Two-column layouts are acceptable on wide screens; stack sections on small screens.
+
+## Component data review workflow
+
+Group engineering values by component when possible and separate by status:
+- **Approved data**: `approved`, `user_entered`
+- **Needs review**: `needs_review`, `ai_extracted`
+- **Rejected**: `rejected`
+
+Rules:
+- Approved/user-entered values are committed data and should not present Approve/Reject as primary actions.
+- Needs-review values should provide clear Approve/Reject actions.
+- Rejected values must be visually separated from current/approved data.
+- Unassigned extracted values must remain visible in a separate section and be assignable.
+- AI-extracted values must never be auto-approved.
+
+## Document extraction workflow
+
+Documents can be attached to a project and optionally a component.
+
+- If a document is component-assigned, extracted candidate values should be assigned to that component.
+- Extraction attempt rows should show: status, provider/mode, created values count, safe value labels/keys, warnings/errors, OpenAI-called signal when relevant, and fixture name when applicable.
+- `created` counts must include only persisted `EngineeringValue` records (not diagnostics, previews, dropped/skipped candidates, or warnings).
+- Collapse long diagnostics/text previews by default.
+
+## Fixture workflow
+
+Use fixtures to replay saved extraction results without consuming OpenAI credits.
+
+- Fixture mode must not call OpenAI.
+- Fixtures must not store API keys/secrets/authorization headers.
+- Avoid storing full raw document text or huge raw model responses by default.
+- Fixture UI should show clear states: loading, empty, list, and load-failed.
+- Saving fixtures must show explicit success or failure (never silent failure).
+- Replayed values should regenerate ids/project/document/component/timestamps, default to `needs_review`, and clearly indicate fixture replay/test origin in attempt details.
+
+## Component library workflow
+
+The component library stores reusable reviewed component data.
+
+- Promote `approved` and `user_entered` values by default.
+- Promotion UX should show library name, tags, optional description, and value count.
+- If no eligible values exist, disable promotion or show a clear error.
+- Support simple search by component name/type/tags and manufacturer/model where practical.
+- Library entries should show name, type, tags, approved value count, and origin when available.
+- Copying from library must not auto-overwrite project values.
+
+## API and error-handling rules
+
+- Convert API failures into friendly, user-visible messages.
+- Never leave the UI stuck in loading after failure.
+- Browser calls should use same-origin `/api` proxy by default.
+- Do not expose `OPENAI_API_KEY`, auth headers, raw secrets, unnecessary full document contents, or huge raw model responses.
+- OpenAI status may show configured/not configured, provider/mode, safe model name, and smoke-test pass/fail.
+- Never show full or partial API keys.
+
+## Testing and verification
+
+For feature work, add/update tests for:
+- success path
+- empty state
+- error state
+- key safety behavior
+- UI state reset after failure
+
+For UI work, test visible labels/buttons/statuses and state transitions where practical.
+
+Before finishing tasks, run and report:
+- `npm run typecheck`
+- `npm run test`
+- `make check`
+
+Report failures honestly and distinguish task regressions from environment issues.
+
+## Documentation expectations
+
+When user-facing behavior changes, update relevant docs:
+- `README.md` for operator/developer workflow updates
+- `docs/test-plan.md` for acceptance criteria and coverage
+- `docs/ai-safety-rules.md` for AI/key/data-safety changes
+- `docs/architecture.md` for meaningful architecture changes
+
+Do not churn docs for tiny internal-only edits.
+
