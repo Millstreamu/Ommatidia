@@ -264,3 +264,11 @@ Package-focused (optional):
 - [ ] Runtime key source is shown as runtime/environment/none.
 - [ ] Clearing runtime key falls back to environment key when present.
 - [ ] Smoke test and extraction use runtime key when present.
+
+## Task 21A drill-down navigation acceptance criteria
+- Projects page lists projects and create form.
+- Project overview route shows summary stats and compact component cards with counts.
+- Component detail route shows component header, status counts, values table, and assigned documents.
+- Unassigned extracted values are visible via dedicated warning/link and review view.
+- Extraction diagnostics and OpenAI text preview remain collapsed by default.
+- Back navigation links are visible on drill-down pages.

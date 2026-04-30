@@ -54,3 +54,7 @@ Users can export saved report sections to a Microsoft Word `.docx` document from
 - **Clear status communication**: status badges and alerts should make approval state and provider mode obvious at a glance.
 - **No hidden AI decisions**: extraction mode and OpenAI readiness are always visible in the header status panel.
 - **Fixtures for repeatable testing**: fixture workflows remain visible and unchanged so deterministic replay testing is easy.
+
+## Drill-down project workflow UI
+
+The web app now follows a drill-down navigation model so users see summary-first screens instead of one massive project page. Project overview screens focus on project-level stats and compact module cards; component detail screens focus on one component at a time (review states, assigned documents, and extraction actions). Advanced diagnostics remain available but collapsed by default.
