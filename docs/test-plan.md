@@ -272,3 +272,11 @@ Package-focused (optional):
 - Unassigned extracted values are visible via dedicated warning/link and review view.
 - Extraction diagnostics and OpenAI text preview remain collapsed by default.
 - Back navigation links are visible on drill-down pages.
+
+
+## Task 21B-1 document detail shell acceptance criteria
+- Document detail route supports `#/projects/:projectId/documents/:documentId`.
+- Project overview document rows include an Open link to the document detail route.
+- Component detail assigned document rows include an Open document link.
+- Document detail shell shows Back to project, filename, document type, file size, upload/processing status, assigned component, and View file link.
+- Missing/unknown document id shows friendly Document not found state with Back to project link.
