@@ -181,9 +181,12 @@ API uploads are stored in `storage/uploads/` for local development only. The fol
 ## Using the component library
 
 - Approve component values first (`approved`/`user_entered`) so promotion only captures reviewed data.
-- In each component review card, click **Promote to library** and provide a library name, comma-separated tags, and optional description.
+- In each component review card or component detail page, click **Promote to library** to open a compact form with library name, comma-separated tags, and optional description.
+- The form shows exactly how many eligible values will be promoted and allows confirm only when at least one `approved`/`user_entered` value exists.
+- After successful promotion, the UI confirms **Component promoted to library.** and links directly to `#/projects/:projectId/library`.
 - Use the **Component library** search box to find saved components by name, type, tag, and practical manufacturer/model values.
-- Use **Copy to current project** to reuse saved components in another project when supported by the current API.
+- Use **Copy to current project** to open a compact copy panel with optional component name override when supported by the current API.
+- After successful copy, the UI links to the new component detail page in the current project when available.
 
 ## Extraction environment variables
 
