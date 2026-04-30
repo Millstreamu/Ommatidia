@@ -134,6 +134,8 @@ This test plan defines acceptance criteria and validation strategy for existing 
 - [ ] Component library section shows loading/empty/error/result states clearly.
 - [ ] Component library search finds by name/type/tag (and manufacturer/model when available).
 - [ ] Library list shows tags and approved value counts for each item.
+- [ ] Dedicated component library page route (`#/projects/:projectId/library`) renders back link, title, helper text, search, and list states (loading/empty/no-results/error).
+- [ ] Project overview shows compact library summary (count + latest 3 + Open library button).
 
 ## Manual smoke test checklist
 1. Create project, component, and engineering values in the web app.
@@ -165,6 +167,7 @@ This test plan defines acceptance criteria and validation strategy for existing 
 | Browser API calls use same-origin `/api` and web server strips `/api` when proxying to API on 3001 | Covered by UI/web proxy tests |
 | Projects empty/list rendering states | Covered by UI test |
 | Dedicated fixtures page shell + compact overview summary card | Covered by UI rendering tests |
+| Dedicated component library page shell + compact overview summary card | Covered by UI rendering tests |
 | Project details workflow section headings | Covered by UI test |
 | Engineering status badge rendering | Covered by UI test |
 | System status badge states (openai connected/missing, mock, unavailable) | Covered by API + UI tests |
