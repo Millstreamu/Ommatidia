@@ -287,3 +287,20 @@ test('openai smoke test returns safe not-configured response when key missing', 
     });
   } finally { if (prevKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = prevKey; }
 });
+
+
+test('extraction fixture save/list/get/delete flow', async () => { await withServer(async (base) => {
+  const payload = { name:'Danfoss sample', originalFilename:'danfoss.pdf', documentType:'datasheet', candidateValues:[{ id:'v1', projectId:'p1', key:'pressure', label:'Pressure', value:200, valueType:'number', unit:'bar', status:'needs_review', sourceReferences:[], createdAt:new Date().toISOString(), updatedAt:new Date().toISOString(), apiKey:'should_not_store', rawText:'full text' }], warnings:['check unit'] };
+  const savedRes = await fetch(`${base}/extraction-fixtures`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(payload) });
+  assert.equal(savedRes.status, 201);
+  const saved = await savedRes.json();
+  assert.equal(saved.name, payload.name);
+  assert.equal(saved.candidateValues[0].apiKey, undefined);
+  assert.equal(saved.candidateValues[0].rawText, undefined);
+  const listed = await (await fetch(`${base}/extraction-fixtures`)).json();
+  assert.ok(listed.length >= 1);
+  const got = await (await fetch(`${base}/extraction-fixtures/${saved.fixtureId}`)).json();
+  assert.equal(got.fixtureId, saved.fixtureId);
+  const del = await (await fetch(`${base}/extraction-fixtures/${saved.fixtureId}`, { method:'DELETE' })).json();
+  assert.equal(del.deleted, true);
+}); });

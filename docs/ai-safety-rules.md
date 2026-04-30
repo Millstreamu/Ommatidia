@@ -60,6 +60,13 @@
 
 - Extraction previews must be sanitized and capped (1000 chars max) and must not expose full document text or secrets in UI/logs by default.
 
+
+## Extraction fixture safety rules (Task 17B)
+
+- Saved extraction fixtures must never include API keys, auth tokens, or secret fields.
+- Saved extraction fixtures must not include full raw document text by default.
+- Fixture persistence/list/get/delete operations must not call OpenAI.
+
 ## PDF internals and vision fallback safety
 
 - Do not infer engineering values from PDF internals (`/Page`, `/Resources`, object streams, etc.).
