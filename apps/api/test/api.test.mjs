@@ -219,6 +219,32 @@ test('system status never includes OPENAI_API_KEY values', async () => {
   }
 });
 
+
+test('system status exposes safe extraction timeout config', async () => {
+  const prevTimeout = process.env.EXTRACTION_TIMEOUT_MS;
+  const prevRetries = process.env.EXTRACTION_MAX_RETRIES;
+  const prevKey = process.env.OPENAI_API_KEY;
+  process.env.EXTRACTION_TIMEOUT_MS = '120000';
+  process.env.EXTRACTION_MAX_RETRIES = '1';
+  process.env.OPENAI_API_KEY = 'super-secret-value';
+  try {
+    await withServer(async (base) => {
+      const res = await fetch(`${base}/system/status`);
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.extractionConfig.timeoutMs, 120000);
+      assert.equal(body.extractionConfig.maxRetries, 1);
+      const raw = JSON.stringify(body);
+      assert.doesNotMatch(raw, /super-secret-value/);
+      assert.doesNotMatch(raw, /OPENAI_API_KEY/);
+    });
+  } finally {
+    if (prevTimeout === undefined) delete process.env.EXTRACTION_TIMEOUT_MS; else process.env.EXTRACTION_TIMEOUT_MS = prevTimeout;
+    if (prevRetries === undefined) delete process.env.EXTRACTION_MAX_RETRIES; else process.env.EXTRACTION_MAX_RETRIES = prevRetries;
+    if (prevKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = prevKey;
+  }
+});
+
 test('extraction uses selected runtime provider for attempts', async () => {
   const prevKey = process.env.OPENAI_API_KEY;
   process.env.OPENAI_API_KEY = 'unit-test-key';

@@ -27,6 +27,29 @@ test('openai zero values adds visible warning', async () => { const svc = new Op
 test('errors never include api key or authorization', async () => { const svc = new OpenAiExtractionService({ responses: { create: async () => { const e = new Error('Authorization: Bearer sk-test-secret'); e.status = 500; throw e; } } }); await assert.rejects(() => call(svc), (err) => !JSON.stringify(err.payload).includes('sk-test-secret') && !JSON.stringify(err.payload).toLowerCase().includes('authorization')); });
 test('timeout returns request_timeout', async () => { const slow = { extractEngineeringValues: async () => { await new Promise((r) => setTimeout(r, 50)); return { candidateValues: [], missingInformation: [], warnings: [] }; } }; const svc = new RetryingExtractionService(slow, 1, 0); await assert.rejects(() => svc.extractEngineeringValues({}), /timed out/); });
 
+test('default timeout is 120000ms when env is not set', () => {
+  const prev = process.env.EXTRACTION_TIMEOUT_MS;
+  delete process.env.EXTRACTION_TIMEOUT_MS;
+  const svc = new RetryingExtractionService({ extractEngineeringValues: async () => ({ candidateValues: [], missingInformation: [], warnings: [] }) });
+  assert.equal(svc.timeoutMs, 120000);
+  if (prev === undefined) delete process.env.EXTRACTION_TIMEOUT_MS; else process.env.EXTRACTION_TIMEOUT_MS = prev;
+});
+
+test('timeout env override is respected', () => {
+  const prev = process.env.EXTRACTION_TIMEOUT_MS;
+  process.env.EXTRACTION_TIMEOUT_MS = '61000';
+  const svc = new RetryingExtractionService({ extractEngineeringValues: async () => ({ candidateValues: [], missingInformation: [], warnings: [] }) });
+  assert.equal(svc.timeoutMs, 61000);
+  if (prev === undefined) delete process.env.EXTRACTION_TIMEOUT_MS; else process.env.EXTRACTION_TIMEOUT_MS = prev;
+});
+
+test('timeout error includes timeoutMs details', async () => {
+  const slow = { extractEngineeringValues: async () => { await new Promise((r) => setTimeout(r, 50)); return { candidateValues: [], missingInformation: [], warnings: [] }; } };
+  const svc = new RetryingExtractionService(slow, 1, 0);
+  await assert.rejects(() => svc.extractEngineeringValues({}), (err) => err.payload.errorCode === 'request_timeout' && err.payload.details.timeoutMs === 1 && err.payload.retryable === true);
+});
+
+
 
 test('empty output returns invalid_model_response with safe diagnostics', async () => { const svc = new OpenAiExtractionService({ responses: { create: async () => ({ id:'resp_1', status:'completed', output:[{ type:'message', content:[] }] }) } }, 'gpt-x'); await assert.rejects(() => call(svc), (err) => err.payload.errorCode === 'invalid_model_response' && err.payload.details.responseId === 'resp_1'); });
 test('schema invalid output is not labelled empty output', async () => { const svc = new OpenAiExtractionService({ responses: { create: async () => ({ output_text: '{"candidateValues":123,"missingInformation":[],"warnings":[]}' }) } }); await assert.rejects(() => call(svc), (err) => err.payload.errorCode === 'schema_invalid_response'); });
