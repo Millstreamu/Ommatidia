@@ -280,3 +280,10 @@ Package-focused (optional):
 - Component detail assigned document rows include an Open document link.
 - Document detail shell shows Back to project, filename, document type, file size, upload/processing status, assigned component, and View file link.
 - Missing/unknown document id shows friendly Document not found state with Back to project link.
+
+## Task 21B-2 document attempt detail acceptance criteria
+- Document detail page shows an Extraction attempts section with per-attempt status, provider, fixture name when present, created count, safe candidate labels/keys, warning/error summary, and started/completed timestamps when available.
+- Attempt diagnostics are collapsed by default under `<details><summary>Show diagnostics</summary>`.
+- Text preview appears only inside collapsed diagnostics details.
+- Project overview documents list remains compact and shows only latest attempt summary (no long diagnostics/text preview).
+- Project overview document rows include an Open document link for drill-down details.

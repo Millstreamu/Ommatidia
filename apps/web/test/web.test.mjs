@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEngineeringValueForm, renderDocumentList, renderDocumentDetailView, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection, renderFixtureList, renderComponentLibrarySection, renderAlert } from '../dist/app.js';
+import { validateEngineeringValueForm, renderDocumentList, renderDocumentDetailView, renderExtractionAttemptRow, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection, renderFixtureList, renderComponentLibrarySection, renderAlert } from '../dist/app.js';
 import { startWebApp } from '../dist/index.js';
 import { createServer } from 'node:http';
 import { ApiClient } from '../dist/apiClient.js';
@@ -386,11 +386,15 @@ test('document detail route shell renders metadata and back link', () => {
   assert.match(html, /1024 bytes/);
   assert.match(html, /uploaded \/ pending_processing/);
   assert.match(html, /Back to project/);
+  assert.match(html, /Extraction attempts/);
+  assert.match(html, /document-extract-attempts/);
 });
 
 test('project overview document row includes Open link', () => {
-  const html = `#/projects/p1/documents/d1`;
-  assert.match(html, /#\/projects\/p1\/documents\/d1/);
+  const html = '<li>Open document | Latest attempt: <span id="extract-attempt-summary-d1">Loading…</span></li>';
+  assert.match(html, /Open document/);
+  assert.match(html, /Latest attempt/);
+  assert.doesNotMatch(html, /Text preview/);
 });
 
 test('component detail assigned document row includes Open document link', () => {
@@ -402,4 +406,16 @@ test('missing document route shows friendly not found state', () => {
   const html = '<h2>Document not found</h2><a href="#/projects/p1">Back to project</a>';
   assert.match(html, /Document not found/);
   assert.match(html, /Back to project/);
+});
+
+test('extraction attempt row keeps diagnostics collapsed with text preview inside details', () => {
+  const html = renderExtractionAttemptRow({
+    status: 'succeeded',
+    provider: 'openai',
+    valuesCreatedCount: 2,
+    warnings: ['low confidence'],
+    diagnostics: { pdfTextPreview: 'flow 40lpm', openAiCalled: true }
+  });
+  assert.match(html, /<details><summary>Show diagnostics<\/summary>/);
+  assert.match(html, /Text preview:/);
 });
