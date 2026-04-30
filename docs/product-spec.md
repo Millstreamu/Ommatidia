@@ -58,6 +58,7 @@ Users can export saved report sections to a Microsoft Word `.docx` document from
 - **Clear status communication**: status badges and alerts should make approval state and provider mode obvious at a glance.
 - **No hidden AI decisions**: extraction mode and OpenAI readiness are always visible in the header status panel.
 - **Fixtures for repeatable testing**: fixture workflows remain visible and unchanged so deterministic replay testing is easy.
+- **Dedicated fixtures page**: project drill-down includes `#/projects/:projectId/fixtures` for fixture browsing, while project overview keeps a compact fixtures summary card.
 
 ## Drill-down project workflow UI
 

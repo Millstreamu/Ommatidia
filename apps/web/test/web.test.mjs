@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEngineeringValueForm, renderDocumentList, renderDocumentDetailView, renderExtractionAttemptRow, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection, renderFixtureList, renderComponentLibrarySection, renderAlert, renderDocumentValuesSection } from '../dist/app.js';
+import { validateEngineeringValueForm, renderDocumentList, renderDocumentDetailView, renderExtractionAttemptRow, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection, renderFixtureList, renderComponentLibrarySection, renderAlert, renderDocumentValuesSection, renderFixturesPageShell, renderFixtureSummaryCard } from '../dist/app.js';
 import { startWebApp } from '../dist/index.js';
 import { createServer } from 'node:http';
 import { ApiClient } from '../dist/apiClient.js';
@@ -49,6 +49,38 @@ test('engineering value status badges include key statuses', () => {
 });
 test('renderAlert includes alert variant class', () => {
   assert.match(renderAlert('hello', 'warning'), /alert-warning/);
+});
+
+test('fixtures page shell renders title, helper text, and back link', () => {
+  const html = renderFixturesPageShell('p1', 'Loading fixtures...');
+  assert.match(html, /Back to project/);
+  assert.match(html, /Extraction fixtures/);
+  assert.match(html, /Fixtures let you replay saved extraction results without using OpenAI credits\./);
+});
+
+test('fixture list supports loading, empty, populated, and error states', () => {
+  assert.match(renderFixtureList([], { loading: true }), /Loading fixtures/);
+  assert.match(renderFixtureList([]), /No fixtures saved yet\./);
+  const html = renderFixtureList([{ fixtureId: 'f1', name: 'fixture-a', originalFilename: 'pump.pdf', candidateValues: [{}, {}], createdAt: '2026-01-01T00:00:00.000Z' }]);
+  assert.match(html, /fixture-a/);
+  assert.match(html, /pump\.pdf/);
+  assert.match(html, /2 values/);
+  assert.match(renderFixtureList([], { error: 'network timeout' }), /Could not load fixtures: network timeout/);
+});
+
+test('fixture summary card is compact and links to dedicated fixtures route', () => {
+  const html = renderFixtureSummaryCard('p1', [
+    { fixtureId: 'f1', name: 'fx-1', originalFilename: 'a.pdf', candidateValues: [], createdAt: '2026-01-01T00:00:00.000Z' },
+    { fixtureId: 'f2', name: 'fx-2', originalFilename: 'b.pdf', candidateValues: [], createdAt: '2026-01-01T00:00:00.000Z' },
+    { fixtureId: 'f3', name: 'fx-3', originalFilename: 'c.pdf', candidateValues: [], createdAt: '2026-01-01T00:00:00.000Z' },
+    { fixtureId: 'f4', name: 'fx-4', originalFilename: 'd.pdf', candidateValues: [], createdAt: '2026-01-01T00:00:00.000Z' }
+  ]);
+  assert.match(html, /Fixture count: <span id="fixture-count">4<\/span>/);
+  assert.match(html, /fx-1/);
+  assert.match(html, /fx-3/);
+  assert.doesNotMatch(html, /fx-4/);
+  assert.match(html, /href="#\/projects\/p1\/fixtures"/);
+  assert.doesNotMatch(html, /Loading fixtures…/);
 });
 test('component review layout groups statuses and actions correctly', () => {
   const html = renderEngineeringValuesSection(
