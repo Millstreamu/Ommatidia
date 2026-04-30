@@ -50,6 +50,11 @@ export class ApiClient {
   listExtractionFixtures() { return this.request<ExtractionFixture[]>('/extraction-fixtures'); }
   getExtractionFixture(fixtureId: string) { return this.request<ExtractionFixture>(`/extraction-fixtures/${fixtureId}`); }
   deleteExtractionFixture(fixtureId: string) { return this.request<{ deleted: boolean }>(`/extraction-fixtures/${fixtureId}`, { method: 'DELETE' }); }
+  saveFixture(input: { name: string; originalFilename: string; documentType: string; componentType?: string; componentName?: string; candidateValues: EngineeringValue[]; warnings: string[] }) { return this.saveExtractionFixture(input); }
+  listFixtures() { return this.listExtractionFixtures(); }
+  getFixture(fixtureId: string) { return this.getExtractionFixture(fixtureId); }
+  deleteFixture(fixtureId: string) { return this.deleteExtractionFixture(fixtureId); }
+  replayFixture(input: { projectId: string; documentId: string; componentId?: string; fixtureId: string; extractionTarget?: { componentType?: string; moduleType?: string } }) { return this.extractValues(input); }
 
   generateReportSection(input: { projectId: string; componentId?: string; sectionType: 'component_summary' | 'calculation_summary' | 'assumptions_and_warnings' | 'missing_information' | 'source_references'; engineeringValues: EngineeringValue[]; missingInformation?: string[]; assumptions?: string[]; warnings?: string[] }) { return this.request<ReportSection>('/report-sections/generate', { method: 'POST', body: JSON.stringify(input) }); }
   listReportSections(projectId: string) { return this.request<ReportSection[]>(`/report-sections?projectId=${projectId}`); }
