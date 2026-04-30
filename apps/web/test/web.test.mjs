@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection } from '../dist/app.js';
+import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection, renderFixtureList } from '../dist/app.js';
 import { startWebApp } from '../dist/index.js';
 import { createServer } from 'node:http';
 import { ApiClient } from '../dist/apiClient.js';
@@ -291,6 +291,16 @@ test('UI diagnostics includes file/vision fallback called field', () => {
   assert.match(text, /OpenAI file\/vision fallback called: yes/);
 });
 
+test('fixture list renders loading/empty/error/saved states', () => {
+  assert.equal(renderFixtureList([], { loading: true }), 'Loading fixtures...');
+  assert.equal(renderFixtureList([]), 'No fixtures saved yet.');
+  assert.equal(renderFixtureList([], { error: 'network down' }), 'Could not load fixtures: network down');
+  const html = renderFixtureList([{ fixtureId: 'f1', name: 'Danfoss pump extraction', originalFilename: 'Danfoss-product-details-2026-04-28.pdf', candidateValues: [{ key: 'pressure' }], componentName: 'Danfoss Pump', createdAt: '2026-04-28T00:00:00.000Z' }]);
+  assert.match(html, /Danfoss pump extraction/);
+  assert.match(html, /1 values/);
+  assert.match(html, /Component: Danfoss Pump/);
+});
+
 
 test('API client exposes extraction fixture endpoints', async () => {
   const calls = [];
@@ -301,10 +311,19 @@ test('API client exposes extraction fixture endpoints', async () => {
   await client.listExtractionFixtures();
   await client.getExtractionFixture('f1');
   await client.deleteExtractionFixture('f1');
+  await client.listFixtures();
+  await client.getFixture('f1');
+  await client.deleteFixture('f1');
+  await client.replayFixture({ projectId: 'p1', documentId: 'd1', fixtureId: 'f1' });
   assert.equal(calls[0].url, 'http://local/extraction-fixtures');
   assert.equal(calls[0].method, 'POST');
   assert.equal(calls[1].url, 'http://local/extraction-fixtures');
   assert.equal(calls[2].url, 'http://local/extraction-fixtures/f1');
   assert.equal(calls[3].method, 'DELETE');
+  assert.equal(calls[4].url, 'http://local/extraction-fixtures');
+  assert.equal(calls[5].url, 'http://local/extraction-fixtures/f1');
+  assert.equal(calls[6].method, 'DELETE');
+  assert.equal(calls[7].url, 'http://local/extractions');
+  assert.equal(calls[7].method, 'POST');
   global.fetch = originalFetch;
 });

@@ -58,8 +58,12 @@ This test plan defines acceptance criteria and validation strategy for existing 
 ### Extraction fixtures and replay (Task 17B/17C)
 - [ ] User can save a successful extraction result as a test fixture.
 - [ ] Fixture list shows name, filename, value count, and created date.
+- [ ] Fixture list state machine shows exactly one state: loading, empty, error, or list.
 - [ ] Fixture save sanitizes secret-like fields and excludes full raw document text by default.
 - [ ] Fixture list/get/delete API routes work without OpenAI calls.
+- [ ] Fixture replay requires selected fixture in Fixture provider mode.
+- [ ] Fixture replay creates `needs_review` values for selected document/component.
+- [ ] Fixture attempt row clearly indicates `provider: fixture` and `OpenAI not called`.
 
 ### Extraction provider switching
 - [ ] User can switch extraction provider between mock and OpenAI from header controls.
