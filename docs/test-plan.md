@@ -122,6 +122,11 @@ This test plan defines acceptance criteria and validation strategy for existing 
 - [ ] needs_review and ai_extracted values show Approve/Reject actions and move sections after status updates.
 - [ ] Rejected values appear only in Rejected subsection.
 - [ ] Unassigned extracted values are rendered separately and can be assigned to a component from UI.
+- [ ] Component promotion form allows custom library name, tags, and optional description.
+- [ ] Promotion count includes only approved/user_entered values and disables confirm at zero.
+- [ ] Component library section shows loading/empty/error/result states clearly.
+- [ ] Component library search finds by name/type/tag (and manufacturer/model when available).
+- [ ] Library list shows tags and approved value counts for each item.
 
 ## Manual smoke test checklist
 1. Create project, component, and engineering values in the web app.

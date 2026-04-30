@@ -61,7 +61,7 @@ export class ApiClient {
   updateReportSection(id: string, input: { title?: string; bodyMarkdown?: string; status?: string }) { return this.request<ReportSection>(`/report-sections/${id}`, { method: 'PATCH', body: JSON.stringify(input) }); }
 
   listComponentLibrary(q?: string) { return this.request<ComponentLibraryItem[]>(`/component-library${q ? `?q=${encodeURIComponent(q)}` : ''}`); }
-  promoteComponentToLibrary(input: { projectId: string; componentId: string; name?: string; tags?: string[] }) { return this.request<ComponentLibraryItem>('/component-library/promote', { method: 'POST', body: JSON.stringify(input) }); }
+  promoteComponentToLibrary(input: { projectId: string; componentId: string; name?: string; tags?: string[]; description?: string }) { return this.request<ComponentLibraryItem>('/component-library/promote', { method: 'POST', body: JSON.stringify(input) }); }
   copyLibraryToProject(libraryId: string, input: { targetProjectId: string; componentName?: string }) { return this.request<{ component: Component; engineeringValues: EngineeringValue[] }>(`/component-library/${libraryId}/copy-to-project`, { method: 'POST', body: JSON.stringify(input) }); }
   compareLibraryWithComponent(libraryId: string, input: { targetProjectId: string; targetComponentId: string }) { return this.request<{ matching: unknown[]; differing: unknown[]; missingInTarget: unknown[]; extraInTarget: unknown[] }>(`/component-library/${libraryId}/compare`, { method: 'POST', body: JSON.stringify(input) }); }
 
@@ -82,4 +82,4 @@ export interface ExtractionFixture { fixtureId: string; id?: string; name: strin
 export interface ReportSection { id: string; projectId: string; title: string; bodyMarkdown: string; sourceReferences: Array<{ documentId: string; pageNumber?: number; sectionTitle?: string; sourceText?: string }>; status: string; createdAt: string; updatedAt: string; }
 
 export interface LibraryEngineeringValue { key:string; label:string; value:number|string|boolean; valueType:string; unit?:string; status:string; notes?:string; sourceReferences:Array<{documentId:string; pageNumber?:number; sectionTitle?:string; sourceText?:string}> }
-export interface ComponentLibraryItem { id:string; name:string; componentType:string; description?:string; approvedEngineeringValues:LibraryEngineeringValue[]; tags:string[]; createdAt:string; updatedAt:string }
+export interface ComponentLibraryItem { id:string; name:string; componentType:string; description?:string; approvedEngineeringValues:LibraryEngineeringValue[]; tags:string[]; createdAt:string; updatedAt:string; originatingProjectId?: string; originatingComponentId?: string }
