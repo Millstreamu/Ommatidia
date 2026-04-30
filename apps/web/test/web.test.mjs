@@ -400,7 +400,9 @@ test('document detail route shell renders metadata and back link', () => {
     projectId: 'p1',
     document: { id: 'd1', originalFilename: 'pump.pdf', documentType: 'datasheet', fileSizeBytes: 1024, uploadStatus: 'uploaded', processingStatus: 'pending_processing' },
     componentName: 'Main Pump',
-    apiBaseUrl: 'http://localhost:3000'
+    apiBaseUrl: 'http://localhost:3000',
+    extractionProvider: 'fixture',
+    components: [{ id: 'c1', name: 'Main Pump', type: 'pump' }]
   });
   assert.match(html, /Document detail/);
   assert.match(html, /pump.pdf/);
@@ -409,14 +411,19 @@ test('document detail route shell renders metadata and back link', () => {
   assert.match(html, /uploaded \/ pending_processing/);
   assert.match(html, /Back to project/);
   assert.match(html, /Extraction attempts/);
+  assert.match(html, /Extraction controls/);
+  assert.match(html, /data-extract-doc-id="d1"/);
+  assert.match(html, /data-retry-doc-id="d1"/);
+  assert.match(html, /data-extract-fixture-id="d1"/);
+  assert.match(html, /save-fixture-btn-d1/);
   assert.match(html, /document-extract-attempts/);
 });
 
 test('project overview document row includes Open link', () => {
-  const html = '<li>Open document | Latest attempt: <span id="extract-attempt-summary-d1">Loading…</span></li>';
+  const html = '<li>pump.pdf | datasheet | Component: Unassigned | Latest attempt: <span id="extract-attempt-summary-d1">Loading…</span> | <a href="#/projects/p1/documents/d1">Open document</a></li>';
   assert.match(html, /Open document/);
   assert.match(html, /Latest attempt/);
-  assert.doesNotMatch(html, /Text preview/);
+  assert.doesNotMatch(html, /Run extraction/);
 });
 
 test('component detail assigned document row includes Open document link', () => {
