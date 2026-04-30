@@ -156,7 +156,7 @@ export function renderProjectsView(projects: Array<{ id: string; name: string; d
 
 type UiComponent = { id: string; name: string; type: string };
 type UiEngineeringValue = { id: string; componentId?: string; documentId?: string; label: string; value: number | string | boolean; unit?: string; status: string };
-type UiFixture = { fixtureId: string; name: string; originalFilename: string; candidateValues: unknown[]; componentName?: string; createdAt: string };
+type UiFixture = { fixtureId: string; name: string; originalFilename: string; candidateValues: unknown[]; componentName?: string; componentType?: string; createdAt: string };
 const APPROVED_STATUSES = new Set(['approved', 'user_entered']);
 const NEEDS_REVIEW_STATUSES = new Set(['needs_review', 'ai_extracted']);
 const REJECTED_STATUSES = new Set(['rejected']);
@@ -167,7 +167,35 @@ export function renderFixtureList(fixtures: UiFixture[], options: { loading?: bo
   if (options.loading) return renderEmptyState('Loading fixtures…', 'Please wait while fixtures are loaded.');
   if (options.error) return renderAlert(`Could not load fixtures: ${options.error}`, 'error');
   if (!fixtures.length) return renderEmptyState('No fixtures saved yet.', 'Save extracted values as fixtures for repeatable testing.');
-  return fixtures.map((f) => `<li><strong>${f.name}</strong><br/>${f.originalFilename}<br/>${f.candidateValues.length} values<br/>Component: ${f.componentName ?? 'Unassigned'}<br/>Created: ${new Date(f.createdAt).toLocaleString()}</li>`).join('');
+  return fixtures.map((f) => `<article style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;margin-bottom:10px;">
+    <h3 style="margin:0 0 6px;">${escapeHtml(f.name)}</h3>
+    <p style="margin:2px 0;"><strong>Original file:</strong> ${escapeHtml(f.originalFilename)}</p>
+    <p style="margin:2px 0;"><strong>Candidate values:</strong> ${f.candidateValues.length}</p>
+    <p style="margin:2px 0;"><strong>Component:</strong> ${escapeHtml(f.componentName ?? 'Unassigned')} (${escapeHtml(f.componentType ?? 'n/a')})</p>
+    <p style="margin:2px 0 8px;"><strong>Created:</strong> ${new Date(f.createdAt).toLocaleString()}</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button data-fixture-replay-open-id="${f.fixtureId}">Replay fixture</button>
+    </div>
+    <section id="fixture-replay-panel-${f.fixtureId}" hidden style="margin-top:10px;padding:10px;border-top:1px solid #e2e8f0;">
+      <p style="margin:0 0 8px;">Replay does not call OpenAI.</p>
+      <p style="margin:0 0 8px;">Replayed values will require review.</p>
+      <label>Target component:
+        <select data-fixture-replay-component-id="${f.fixtureId}">
+          <option value="">Select component</option>
+        </select>
+      </label>
+      <br/>
+      <label>Target document:
+        <select data-fixture-replay-document-id="${f.fixtureId}">
+          <option value="">Select document</option>
+        </select>
+      </label>
+      <div style="margin-top:8px;">
+        <button data-fixture-replay-run-id="${f.fixtureId}">Run replay</button>
+      </div>
+      <p id="fixture-replay-status-${f.fixtureId}" style="margin-top:8px;"></p>
+    </section>
+  </article>`).join('');
 }
 
 export function renderFixturesPageShell(projectId: string, fixtureContent: string): string {
@@ -419,6 +447,44 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
           : '<option value="">No fixtures saved</option>';
       });
       view.querySelectorAll<HTMLButtonElement>('button[data-extract-doc-id]').forEach((btn) => { btn.onclick = async () => { const statusEl = view.querySelector(`#extract-status-${btn.dataset.extractDocId!}`) as HTMLElement; statusEl.textContent = 'Extracting...'; try { const docSelect = view.querySelector(`select[data-document-component-id="${btn.dataset.extractDocId!}"]`) as HTMLSelectElement | null; const selectedComponentId = docSelect?.value || undefined; const fixtureSelect = view.querySelector(`select[data-extract-fixture-id="${btn.dataset.extractDocId!}"]`) as HTMLSelectElement | null; const fixtureId = fixtureSelect?.value || undefined; if (latestSystemStatus?.extractionProvider === 'fixture' && !fixtureId) throw new Error('Select a fixture before replaying.'); const result = await client.extractValues({ projectId, documentId: btn.dataset.extractDocId!, componentId: selectedComponentId, fixtureId }); const keys = Array.isArray((result as any).createdCandidateKeys) ? (result as any).createdCandidateKeys.join(', ') : ''; statusEl.textContent = `Success: provider ${result.providerMetadata?.provider ?? 'unknown'} | created ${result.valuesCreatedCount ?? 0} value(s)${keys ? ` — ${keys}` : ''}. ${result.warnings?.[0] ?? ''}`; await load(); } catch (error) { const err = error as Error & { extractionError?: { errorCode?: string; message?: string; retryable?: boolean; userAction?: string; details?: Record<string, unknown> } }; statusEl.textContent = formatExtractionFailure(err); } }; });
+      if (isFixturesRoute) {
+        view.querySelectorAll<HTMLButtonElement>('button[data-fixture-replay-open-id]').forEach((btn) => {
+          btn.onclick = () => {
+            const fixtureId = btn.dataset.fixtureReplayOpenId!;
+            const panel = view.querySelector(`#fixture-replay-panel-${fixtureId}`) as HTMLElement | null;
+            const componentSelect = view.querySelector(`select[data-fixture-replay-component-id="${fixtureId}"]`) as HTMLSelectElement | null;
+            const documentSelect = view.querySelector(`select[data-fixture-replay-document-id="${fixtureId}"]`) as HTMLSelectElement | null;
+            if (!panel || !componentSelect || !documentSelect) return;
+            panel.hidden = !panel.hidden;
+            componentSelect.innerHTML = `<option value="">Select component</option>${components.map((c) => `<option value="${c.id}">${c.name} (${c.type})</option>`).join('')}`;
+            documentSelect.innerHTML = `<option value="">Select document</option>${documents.map((d) => `<option value="${d.id}">${d.originalFilename}</option>`).join('')}`;
+          };
+        });
+        view.querySelectorAll<HTMLButtonElement>('button[data-fixture-replay-run-id]').forEach((btn) => {
+          btn.onclick = async () => {
+            const fixtureId = btn.dataset.fixtureReplayRunId!;
+            const statusEl = view.querySelector(`#fixture-replay-status-${fixtureId}`) as HTMLElement | null;
+            const componentSelect = view.querySelector(`select[data-fixture-replay-component-id="${fixtureId}"]`) as HTMLSelectElement | null;
+            const documentSelect = view.querySelector(`select[data-fixture-replay-document-id="${fixtureId}"]`) as HTMLSelectElement | null;
+            if (!statusEl || !componentSelect || !documentSelect) return;
+            const componentId = componentSelect.value || '';
+            const documentId = documentSelect.value || '';
+            if (!componentId || !documentId) {
+              statusEl.textContent = 'Select a target component and target document before replaying.';
+              return;
+            }
+            statusEl.textContent = 'Replaying fixture...';
+            try {
+              const result = await client.replayFixture({ projectId, fixtureId, componentId, documentId });
+              const createdCount = result.valuesCreatedCount ?? 0;
+              statusEl.innerHTML = `Fixture replayed. ${createdCount} values created. <a href="#/projects/${projectId}/components/${componentId}">Open target component</a>`;
+              await load();
+            } catch (error) {
+              statusEl.textContent = formatExtractionFailure(error as Error);
+            }
+          };
+        });
+      }
       view.querySelectorAll<HTMLButtonElement>('button[data-save-fixture-doc-id]').forEach((btn) => {
         btn.onclick = async () => {
           const documentId = btn.dataset.saveFixtureDocId!;
