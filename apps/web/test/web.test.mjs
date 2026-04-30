@@ -109,6 +109,7 @@ test('promote form opens with name/tags fields and eligible value count', () => 
   const html = renderEngineeringValuesSection([{ id: 'c1', name: 'Engine', type: 'Prime mover' }], [{ id: 'v1', componentId: 'c1', label: 'Power', value: 10, status: 'approved' }, { id: 'v2', componentId: 'c1', label: 'Temp', value: 50, status: 'needs_review' }], 'c1');
   assert.match(html, /Library name:/);
   assert.match(html, /Tags:/);
+  assert.match(html, /Description:/);
   assert.match(html, /This will promote 1 approved\/user-entered values/);
 });
 test('promotion disabled when no eligible values', () => {
@@ -120,9 +121,15 @@ test('promotion disabled when no eligible values', () => {
 test('library section renders empty/error/items and tags', () => {
   assert.match(renderComponentLibrarySection([]), /No library components saved yet/);
   assert.match(renderComponentLibrarySection([], { error: 'network' }), /Could not load component library: network/);
-  const html = renderComponentLibrarySection([{ id: 'l1', name: 'Danfoss 25cc Pump', componentType: 'Pump', tags: ['danfoss', 'pump'], approvedEngineeringValues: [{ key: 'model', value: '25cc' }], originatingProjectId: 'p1', originatingComponentId: 'c1' }], { search: 'pump' });
+  const html = renderComponentLibrarySection([{ id: 'l1', name: 'Danfoss 25cc Pump', componentType: 'Pump', tags: ['danfoss', 'pump'], approvedEngineeringValues: [{ key: 'model', value: '25cc' }], originatingProjectId: 'p1', originatingComponentId: 'c1' }], { search: 'pump', copySupported: true });
   assert.match(html, /badge-secondary/);
   assert.match(html, /Approved\/user-entered values: 1/);
+  assert.match(html, /Copy to current project/);
+});
+test('library copy panel renders component name override when opened', () => {
+  const html = renderComponentLibrarySection([{ id: 'l1', name: 'Danfoss 25cc Pump', componentType: 'Pump', tags: ['danfoss'], approvedEngineeringValues: [] }], { copyingLibraryId: 'l1', copySupported: true });
+  assert.match(html, /Component name override/);
+  assert.match(html, /Confirm copy/);
 });
 test('library route renders page title and back link', () => {
   const html = renderComponentLibraryPageShell('p1', '<p>Loading component library...</p>');

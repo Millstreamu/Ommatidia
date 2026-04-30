@@ -131,9 +131,12 @@ This test plan defines acceptance criteria and validation strategy for existing 
 - [ ] Unassigned extracted values are rendered separately and can be assigned to a component from UI.
 - [ ] Component promotion form allows custom library name, tags, and optional description.
 - [ ] Promotion count includes only approved/user_entered values and disables confirm at zero.
+- [ ] Promotion success state shows clear confirmation and link to `#/projects/:projectId/library`.
 - [ ] Component library section shows loading/empty/error/result states clearly.
 - [ ] Component library search finds by name/type/tag (and manufacturer/model when available).
 - [ ] Library list shows tags and approved value counts for each item.
+- [ ] Library copy action opens inline panel with optional component name override (when copy endpoint is supported).
+- [ ] Library copy success links to created component detail page when target component id is returned.
 - [ ] Dedicated component library page route (`#/projects/:projectId/library`) renders back link, title, helper text, search, and list states (loading/empty/no-results/error).
 - [ ] Project overview shows compact library summary (count + latest 3 + Open library button).
 
