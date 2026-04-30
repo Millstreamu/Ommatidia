@@ -119,16 +119,27 @@ export function renderFixtureList(fixtures: UiFixture[], options: { loading?: bo
   if (!fixtures.length) return 'No fixtures saved yet.';
   return fixtures.map((f) => `<li><strong>${f.name}</strong><br/>${f.originalFilename}<br/>${f.candidateValues.length} values<br/>Component: ${f.componentName ?? 'Unassigned'}<br/>Created: ${new Date(f.createdAt).toLocaleString()}</li>`).join('');
 }
-export function renderEngineeringValuesSection(components: UiComponent[], values: UiEngineeringValue[]): string {
+export function renderEngineeringValuesSection(components: UiComponent[], values: UiEngineeringValue[], promotingComponentId?: string): string {
   const componentOptions = components.map((c) => `<option value="${c.id}">${c.name} (${c.type})</option>`).join('');
   const cards = components.map((component) => {
     const componentValues = values.filter((v) => v.componentId === component.id);
     const approved = componentValues.filter((v) => APPROVED_STATUSES.has(v.status));
     const review = componentValues.filter((v) => NEEDS_REVIEW_STATUSES.has(v.status));
     const rejected = componentValues.filter((v) => REJECTED_STATUSES.has(v.status));
+    const promoteCount = approved.length;
+    const promoteForm = promotingComponentId === component.id ? `<form data-promote-form-id="${component.id}" style="margin:8px 0;padding:8px;border:1px solid #cbd5e1;border-radius:8px;">
+      <label>Library name: <input name="name" value="${component.name}" required/></label><br/>
+      <label>Tags: <input name="tags" placeholder="cat, engine, 3054c"/></label><br/>
+      <label>Description: <input name="description" placeholder="optional"/></label>
+      <p>This will promote ${promoteCount} approved/user-entered values.</p>
+      ${promoteCount === 0 ? '<p>No approved/user-entered values are available to promote.</p>' : ''}
+      <button type="submit" ${promoteCount === 0 ? 'disabled' : ''}>Confirm promote</button>
+      <button type="button" data-promote-cancel-id="${component.id}">Cancel</button>
+    </form>` : '';
     return `<article style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;margin-bottom:12px;">
       <h4 style="margin:0;">Component: ${component.name}</h4><p style="margin:4px 0 8px;">Type: ${component.type}</p>
       <button data-promote-component-id="${component.id}">Promote to library</button>
+      ${promoteForm}
       <h5>Approved data</h5><ul style="list-style:none;padding-left:0;">${approved.length ? approved.map((v) => renderValueRow(v)).join('') : '<li>No approved data yet.</li>'}</ul>
       <h5>Needs review</h5><ul style="list-style:none;padding-left:0;">${review.length ? review.map((v) => renderValueRow(v, `<button data-status-id="${v.id}" data-status="approved">Approve</button> <button data-status-id="${v.id}" data-status="rejected">Reject</button>`)).join('') : '<li>No values need review.</li>'}</ul>
       <h5>Rejected</h5><ul style="list-style:none;padding-left:0;">${rejected.length ? rejected.map((v) => renderValueRow(v)).join('') : '<li>No rejected values.</li>'}</ul>
@@ -140,6 +151,16 @@ export function renderEngineeringValuesSection(components: UiComponent[], values
     <article style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;margin-bottom:12px;"><h4>Unassigned extracted values</h4><ul style="list-style:none;padding-left:0;">${unassigned.length ? unassigned.map((v) => renderValueRow(v, `<select data-assign-value-id="${v.id}"><option value="">Select component</option>${componentOptions}</select> <button data-assign-action-id="${v.id}">Assign</button>${NEEDS_REVIEW_STATUSES.has(v.status) ? ` <button data-status-id="${v.id}" data-status="approved">Approve</button> <button data-status-id="${v.id}" data-status="rejected">Reject</button>` : ''}`)).join('') : '<li>None</li>'}</ul></article>
     <div id="engineering-values-error" style="color:#b91c1c;font-weight:600;"></div>
     <form id="value-form"><select name="componentId">${components.map((c) => `<option value="${c.id}">${c.name}</option>`)}</select><input name="key" placeholder="Key" required/><input name="label" placeholder="Label" required/><input name="value" placeholder="Value" required/><select name="valueType"><option>number</option><option>string</option><option>boolean</option></select><input name="unit" placeholder="Unit (optional)"/><select name="status"><option value="user_entered">user_entered</option><option value="needs_review">needs_review</option><option value="approved">approved</option><option value="ai_extracted">ai_extracted</option><option value="rejected">rejected</option><option value="superseded">superseded</option></select><button>Add value</button></form></section>`;
+}
+export function renderComponentLibrarySection(library: Array<{ id: string; name: string; componentType: string; tags: string[]; approvedEngineeringValues: Array<{ key: string; value: unknown }>; originatingProjectId?: string; originatingComponentId?: string }>, options: { search?: string; error?: string } = {}): string {
+  if (options.error) return `<p>Could not load component library: ${options.error}</p>`;
+  if (!library.length && !options.search) return '<p>No library components saved yet.</p>';
+  if (!library.length) return '<p>No library components found.</p>';
+  return `<ul>${library.map((i) => {
+    const manufacturer = i.approvedEngineeringValues.find((v) => v.key.toLowerCase() === 'manufacturer')?.value;
+    const model = i.approvedEngineeringValues.find((v) => v.key.toLowerCase() === 'model')?.value;
+    return `<li><strong>${i.name}</strong><br/>Type: ${i.componentType}<br/>Tags: ${i.tags.join(', ') || 'none'}<br/>Approved values: ${i.approvedEngineeringValues.length}<br/>Origin: ${i.originatingProjectId ?? 'n/a'} / ${i.originatingComponentId ?? 'n/a'}${manufacturer || model ? `<br/>Manufacturer/Model: ${String(manufacturer ?? 'n/a')} / ${String(model ?? 'n/a')}` : ''}<br/><button data-library-copy-id="${i.id}">Copy to current project</button></li>`;
+  }).join('')}</ul>`;
 }
 export async function submitCreateProject(
   client: ApiClient,
@@ -234,18 +255,19 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
         client.listComponentLibrary()
       ]);
       nav.innerHTML = `<a href="#/" style="margin-right:12px;">Projects</a><strong>${project.name}</strong>`;
-      const valuesSection = renderEngineeringValuesSection(components, values);
+      const promoteComponentId = (new URLSearchParams(window.location.search).get('promote') ?? undefined);
+      const valuesSection = renderEngineeringValuesSection(components, values, promoteComponentId);
 
       view.innerHTML = `<h2>${project.name}</h2>
       <section><h3>Project overview</h3><p>${project.description ?? 'No description provided.'}</p></section>
-      <section><h3>Components</h3><ul>${components.map((c) => `<li>${c.name} (${c.type}) <button data-promote-component-id="${c.id}">Promote to library</button></li>`).join('')}</ul><form id="component-form"><input name="name" placeholder="Component name" required/><input name="type" placeholder="Component type" required/><button>Add component</button></form></section>
+      <section><h3>Components</h3><ul>${components.map((c) => `<li>${c.name} (${c.type})</li>`).join('')}</ul><form id="component-form"><input name="name" placeholder="Component name" required/><input name="type" placeholder="Component type" required/><button>Add component</button></form></section>
       ${valuesSection}
       <section><h3>Documents</h3><p>Supported upload file types: PDF, PNG, JPG, JPEG, WEBP.</p><form id="document-form"><input name="file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" required/><select name="documentType"><option value="datasheet">datasheet</option><option value="manual">manual</option><option value="quote">quote</option><option value="schematic">schematic</option><option value="drawing">drawing</option><option value="other">other</option></select><button>Upload document</button></form><ul>${documents.map((d)=>`<li>${d.originalFilename} | ${d.documentType} | ${d.fileSizeBytes} bytes | ${d.uploadStatus}/${d.processingStatus} | Component: <select data-document-component-id="${d.id}"><option value="">Unassigned</option>${components.map((c)=>`<option value="${c.id}" ${d.componentId===c.id?'selected':''}>${c.name}</option>`).join('')}</select> | Fixture: <select data-extract-fixture-id="${d.id}"><option value="">Select fixture</option></select> | <button data-extract-doc-id="${d.id}">Run extraction</button> <button data-save-fixture-doc-id="${d.id}">Save as test fixture</button> <button data-retry-doc-id="${d.id}">Retry</button> <span id="extract-status-${d.id}"></span><ul id="extract-attempts-${d.id}"></ul></li>`).join('')}</ul></section>
       <section><h3>AI extraction</h3><p>Review extracted values carefully. Unapproved values remain visible until accepted or rejected.</p></section>
       <section><h3>Extraction fixtures</h3><ul id="fixture-list">Loading fixtures...</ul></section>
       <section><h3>Calculations</h3><p>Hydraulic power (kW). Enter flow in L/min, pressure in bar, and efficiency as decimal (0-1) or percent (>1).</p><form id="calc-form"><input name="flowLpm" placeholder="Flow (L/min)" required/><input name="pressureBar" placeholder="Pressure (bar)" required/><input name="efficiency" placeholder="Efficiency (0.85 or 85)" required/><button>Run calculation</button></form><pre id="calc-result"></pre></section>
       <section><h3>Report sections</h3><p>Reports are generated from saved report sections. These sections are editable drafts.</p><form id="report-generate-form"><select name="sectionType"><option value="component_summary">Component Summary</option><option value="calculation_summary">Calculation Summary</option><option value="assumptions_and_warnings">Assumptions and Warnings</option><option value="missing_information">Missing Information</option><option value="source_references">Source References</option></select><button>Generate section</button></form><div>${reportSections.map((section) => `<article><input data-report-title-id="${section.id}" value="${section.title}"/><textarea data-report-body-id="${section.id}" rows="6" cols="80">${section.bodyMarkdown}</textarea><button data-report-save-id="${section.id}">Save section</button></article>`).join('')}</div><h3>Word export</h3><p>Word export uses the current saved report sections.</p><button id="export-report-docx">Export Word document</button><span id="export-report-status"></span></section>
-      <section><h3>Component library</h3><ul>${library.map((i) => `<li>${i.name} (${i.componentType}) [${i.approvedEngineeringValues.length}] <button data-library-copy-id="${i.id}">Copy to project</button> <button data-library-compare-id="${i.id}">Compare with first component</button></li>`).join('')}</ul><p>Available modules: ${modules.map((m) => m.name).join(', ')}</p></section>`;
+      <section><h3>Component library</h3><form id="library-search-form"><label>Search: <input id="library-search-input" name="q" value=""/></label><button>Search</button></form><div id="component-library-list">${renderComponentLibrarySection(library)}</div><p>Available modules: ${modules.map((m) => m.name).join(', ')}</p></section>`;
 
       // existing handlers unchanged behavior
       (view.querySelector('#component-form') as HTMLFormElement).onsubmit = async (e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); await client.createComponent({ projectId, name: String(fd.get('name')), type: String(fd.get('type')) }); await load(); };
@@ -326,9 +348,11 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
       (view.querySelector('#report-generate-form') as HTMLFormElement).onsubmit = async (e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); await client.generateReportSection({ projectId, sectionType: String(fd.get('sectionType')) as any, engineeringValues: values }); await load(); };
       view.querySelectorAll<HTMLButtonElement>('button[data-report-save-id]').forEach((btn) => { btn.onclick = async () => { const id = btn.dataset.reportSaveId!; const title = (view.querySelector(`input[data-report-title-id="${id}"]`) as HTMLInputElement).value; const bodyMarkdown = (view.querySelector(`textarea[data-report-body-id="${id}"]`) as HTMLTextAreaElement).value; await client.updateReportSection(id, { title, bodyMarkdown, status: 'needs_review' }); await load(); }; });
       (view.querySelector('#export-report-docx') as HTMLButtonElement).onclick = async () => { const statusEl = view.querySelector('#export-report-status') as HTMLElement; statusEl.textContent = 'Exporting...'; try { await triggerReportSectionsDocxExport(client, { projectId, reportSectionIds: reportSections.map((section) => section.id), documentTitle: `${project.name} Report Sections`, includeSourceReferences: true }); statusEl.textContent = 'Success: download started.'; } catch (error) { statusEl.textContent = `Export failed: ${(error as Error).message}`; } };
-      view.querySelectorAll<HTMLButtonElement>('button[data-promote-component-id]').forEach((btn) => { btn.onclick = async () => { await client.promoteComponentToLibrary({ projectId, componentId: btn.dataset.promoteComponentId! }); await load(); }; });
+      view.querySelectorAll<HTMLButtonElement>('button[data-promote-component-id]').forEach((btn) => { btn.onclick = async () => { const url = new URL(window.location.href); url.searchParams.set('promote', btn.dataset.promoteComponentId!); window.history.replaceState({}, '', url); await load(); }; });
+      view.querySelectorAll<HTMLFormElement>('form[data-promote-form-id]').forEach((form) => { form.onsubmit = async (e) => { e.preventDefault(); const fd = new FormData(form); const componentId = form.dataset.promoteFormId!; try { await client.promoteComponentToLibrary({ projectId, componentId, name: String(fd.get('name') ?? ''), tags: String(fd.get('tags') ?? '').split(',').map((t) => t.trim()).filter(Boolean), description: String(fd.get('description') ?? '') || undefined }); alert('Component promoted to library.'); const url = new URL(window.location.href); url.searchParams.delete('promote'); window.history.replaceState({}, '', url); await load(); } catch (error) { alert(`Could not promote component: ${(error as Error).message}`); } }; });
+      view.querySelectorAll<HTMLButtonElement>('button[data-promote-cancel-id]').forEach((btn) => { btn.onclick = async () => { const url = new URL(window.location.href); url.searchParams.delete('promote'); window.history.replaceState({}, '', url); await load(); }; });
       view.querySelectorAll<HTMLButtonElement>('button[data-library-copy-id]').forEach((btn) => { btn.onclick = async () => { await client.copyLibraryToProject(btn.dataset.libraryCopyId!, { targetProjectId: projectId }); await load(); }; });
-      view.querySelectorAll<HTMLButtonElement>('button[data-library-compare-id]').forEach((btn) => { btn.onclick = async () => { const firstComponent = components[0]; if (!firstComponent) { alert('Add a component first'); return; } const result = await client.compareLibraryWithComponent(btn.dataset.libraryCompareId!, { targetProjectId: projectId, targetComponentId: firstComponent.id }); alert(`Compare: matching=${result.matching.length}, differing=${result.differing.length}, missing=${result.missingInTarget.length}, extra=${result.extraInTarget.length}`); }; });
+      (view.querySelector('#library-search-form') as HTMLFormElement | null)?.addEventListener('submit', async (e) => { e.preventDefault(); const q = String(new FormData(e.currentTarget as HTMLFormElement).get('q') ?? ''); try { const list = await client.listComponentLibrary(q); const listEl = view.querySelector('#component-library-list') as HTMLElement; listEl.innerHTML = renderComponentLibrarySection(list, { search: q }); } catch (error) { const listEl = view.querySelector('#component-library-list') as HTMLElement; listEl.innerHTML = renderComponentLibrarySection([], { error: (error as Error).message }); } });
       (view.querySelector('#calc-form') as HTMLFormElement).onsubmit = async (e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const result = await client.hydraulicPowerKw({ projectId, flowLpm: Number(fd.get('flowLpm')), pressureBar: Number(fd.get('pressureBar')), efficiency: Number(fd.get('efficiency')) }); (view.querySelector('#calc-result') as HTMLElement).textContent = `Formula: Hydraulic Power (kW)\nInputs: ${JSON.stringify(result.inputsUsed)}\nResult: ${JSON.stringify(result.outputs)}\nAssumptions: ${(result.assumptions ?? []).join('; ') || 'none'}\nWarnings: ${(result.warnings ?? []).join('; ') || 'none'}`; };
       return;
     }
@@ -358,4 +382,4 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
   void load();
 }
 
-export async function renderComponentLibrary(client: ApiClient): Promise<string> { const items = await client.listComponentLibrary(); return items.map((i) => `<li>${i.name} (${i.componentType}) [${i.approvedEngineeringValues.length} values] <button data-library-copy-id="${i.id}">Copy to project</button></li>`).join(''); }
+export async function renderComponentLibrary(client: ApiClient): Promise<string> { const items = await client.listComponentLibrary(); return renderComponentLibrarySection(items); }

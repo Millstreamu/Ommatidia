@@ -160,6 +160,13 @@ API uploads are stored in `storage/uploads/` for local development only. The fol
 - `rejected` values are shown separately so users can see what was declined without mixing it into approved data.
 - Unassigned extracted values remain visible and can be assigned to a specific component before/after review.
 
+## Using the component library
+
+- Approve component values first (`approved`/`user_entered`) so promotion only captures reviewed data.
+- In each component review card, click **Promote to library** and provide a library name, comma-separated tags, and optional description.
+- Use the **Component library** search box to find saved components by name, type, tag, and practical manufacturer/model values.
+- Use **Copy to current project** to reuse saved components in another project when supported by the current API.
+
 ## Extraction environment variables
 
 - `EXTRACTION_PROVIDER` (`mock` or `openai`)

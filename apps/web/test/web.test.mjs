@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection, renderFixtureList } from '../dist/app.js';
+import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection, renderFixtureList, renderComponentLibrarySection } from '../dist/app.js';
 import { startWebApp } from '../dist/index.js';
 import { createServer } from 'node:http';
 import { ApiClient } from '../dist/apiClient.js';
@@ -64,6 +64,25 @@ test('component review layout groups statuses and actions correctly', () => {
   assert.match(html, /Rated Speed[\s\S]*Approve<\/button>[\s\S]*Reject<\/button>/);
   assert.match(html, /Unassigned extracted values/);
   assert.match(html, /data-assign-action-id="v5"/);
+});
+test('promote form opens with name/tags fields and eligible value count', () => {
+  const html = renderEngineeringValuesSection([{ id: 'c1', name: 'Engine', type: 'Prime mover' }], [{ id: 'v1', componentId: 'c1', label: 'Power', value: 10, status: 'approved' }, { id: 'v2', componentId: 'c1', label: 'Temp', value: 50, status: 'needs_review' }], 'c1');
+  assert.match(html, /Library name:/);
+  assert.match(html, /Tags:/);
+  assert.match(html, /This will promote 1 approved\/user-entered values/);
+});
+test('promotion disabled when no eligible values', () => {
+  const html = renderEngineeringValuesSection([{ id: 'c1', name: 'Engine', type: 'Prime mover' }], [{ id: 'v1', componentId: 'c1', label: 'Temp', value: 50, status: 'needs_review' }], 'c1');
+  assert.match(html, /No approved\/user-entered values are available to promote/);
+  assert.match(html, /Confirm promote<\/button>/);
+  assert.match(html, /disabled/);
+});
+test('library section renders empty/error/items and tags', () => {
+  assert.match(renderComponentLibrarySection([]), /No library components saved yet/);
+  assert.match(renderComponentLibrarySection([], { error: 'network' }), /Could not load component library: network/);
+  const html = renderComponentLibrarySection([{ id: 'l1', name: 'Danfoss 25cc Pump', componentType: 'Pump', tags: ['danfoss', 'pump'], approvedEngineeringValues: [{ key: 'model', value: '25cc' }], originatingProjectId: 'p1', originatingComponentId: 'c1' }], { search: 'pump' });
+  assert.match(html, /Tags: danfoss, pump/);
+  assert.match(html, /Approved values: 1/);
 });
 
 test('OpenAI status badge renders connected state', () => {
