@@ -61,10 +61,14 @@ test('fixtures page shell renders title, helper text, and back link', () => {
 test('fixture list supports loading, empty, populated, and error states', () => {
   assert.match(renderFixtureList([], { loading: true }), /Loading fixtures/);
   assert.match(renderFixtureList([]), /No fixtures saved yet\./);
-  const html = renderFixtureList([{ fixtureId: 'f1', name: 'fixture-a', originalFilename: 'pump.pdf', candidateValues: [{}, {}], createdAt: '2026-01-01T00:00:00.000Z' }]);
+  const html = renderFixtureList([{ fixtureId: 'f1', name: 'fixture-a', originalFilename: 'pump.pdf', candidateValues: [{}, {}], componentName: 'Pump A', componentType: 'pump', createdAt: '2026-01-01T00:00:00.000Z' }]);
   assert.match(html, /fixture-a/);
   assert.match(html, /pump\.pdf/);
-  assert.match(html, /2 values/);
+  assert.match(html, /Candidate values:<\/strong> 2/);
+  assert.match(html, /Replay fixture/);
+  assert.match(html, /Replay does not call OpenAI\./);
+  assert.match(html, /Replayed values will require review\./);
+  assert.match(html, /data-fixture-replay-run-id="f1"/);
   assert.match(renderFixtureList([], { error: 'network timeout' }), /Could not load fixtures: network timeout/);
 });
 
@@ -390,8 +394,8 @@ test('fixture list renders loading/empty/error/saved states', () => {
   assert.match(renderFixtureList([], { error: 'network down' }), /Could not load fixtures: network down/);
   const html = renderFixtureList([{ fixtureId: 'f1', name: 'Danfoss pump extraction', originalFilename: 'Danfoss-product-details-2026-04-28.pdf', candidateValues: [{ key: 'pressure' }], componentName: 'Danfoss Pump', createdAt: '2026-04-28T00:00:00.000Z' }]);
   assert.match(html, /Danfoss pump extraction/);
-  assert.match(html, /1 values/);
-  assert.match(html, /Component: Danfoss Pump/);
+  assert.match(html, /Candidate values:<\/strong> 1/);
+  assert.match(html, /Component:<\/strong> Danfoss Pump/);
 });
 
 
