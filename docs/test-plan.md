@@ -295,3 +295,11 @@ Package-focused (optional):
 - [x] `approved` and `user_entered` rows do not show Approve/Reject actions.
 - [x] Unassigned values show assign-to-component controls.
 - [x] Empty state renders: "No values have been created from this document yet."
+
+## Document extraction controls moved to document detail (Task 21B-4)
+- [x] Document detail renders extraction controls with provider/mode display.
+- [x] Document detail supports changing assigned component and persists metadata updates.
+- [x] Document detail extraction requests use the selected componentId for future runs.
+- [x] Fixture selector is shown in fixture provider mode.
+- [x] Save-as-test-fixture action is shown on document detail and only enabled when latest attempt created values.
+- [x] Project overview document rows are compact (filename/type/component/latest status/Open document) and do not render full extraction controls.

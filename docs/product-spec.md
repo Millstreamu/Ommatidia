@@ -45,6 +45,8 @@ Users can export saved report sections to a Microsoft Word `.docx` document from
 - Project details are grouped into predictable sections: Project overview, Components, Engineering values, Documents, AI extraction, Calculations, Report sections, and Word export.
 - Documents in project and component views include an Open action that navigates to a dedicated document detail page with metadata and back navigation.
 - Document detail pages include extraction attempt history with collapsed diagnostics so project overviews stay compact while preserving deep troubleshooting context.
+- Document detail pages are the primary place for document-specific extraction actions (component assignment, run/retry extraction, fixture replay selection, and save-as-fixture when values exist).
+- Project overview document rows stay compact and summary-focused (filename/type/component/latest attempt/Open document) without full extraction controls.
 - Engineering values always display explicit status badges (`user_entered`, `approved`, `needs_review`, `ai_extracted`, `rejected`, `superseded`) and keep unapproved values visible for reviewer action.
 - AI extraction UX must show loading, success, normalized friendly errors, and retryability where supported.
 - Calculations stay deterministic and show formula name, units, assumptions, warnings, and result readability.
