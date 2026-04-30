@@ -4,7 +4,7 @@ export interface Project { id: string; name: string; description?: string; proje
 export interface Component { id: string; projectId: string; name: string; type: string; description?: string; createdAt: string; updatedAt: string; }
 export interface EngineeringValue { id: string; projectId: string; componentId?: string; key: string; label: string; value: number | string | boolean; valueType: string; unit?: string; status: string; createdAt: string; updatedAt: string; }
 export interface EngineeringModule { id: string; name: string; description: string; moduleType: string; }
-export interface DocumentRecord { id: string; projectId: string; originalFilename: string; storedFilename: string; mimeType: string; fileSizeBytes: number; documentType: string; uploadStatus: string; processingStatus: string; createdAt: string; updatedAt: string; }
+export interface DocumentRecord { id: string; projectId: string; componentId?: string; originalFilename: string; storedFilename: string; mimeType: string; fileSizeBytes: number; documentType: string; uploadStatus: string; processingStatus: string; createdAt: string; updatedAt: string; }
 export interface SystemStatus { ok: boolean; extractionProvider: 'openai' | 'mock' | 'unknown'; openAiConfigured: boolean; openAiModel?: string; apiProxyMode: boolean; timestamp: string; }
 export interface OpenAiSmokeTestResult { ok: boolean; provider: 'openai'; model: string; openAiConfigured: boolean; statusCode?: number; message: string; timestamp: string; }
 
@@ -33,6 +33,8 @@ export class ApiClient {
   listEngineeringValues(projectId: string) { return this.request<EngineeringValue[]>(`/engineering-values?projectId=${projectId}`); }
   createEngineeringValue(input: { projectId: string; componentId?: string; key: string; label: string; value: number | string | boolean; valueType: string; unit?: string; status: string }) { return this.request<EngineeringValue>('/engineering-values', { method: 'POST', body: JSON.stringify({ ...input, sourceReferences: [] }) }); }
   updateEngineeringValueStatus(valueId: string, status: 'approved' | 'rejected') { return this.request<EngineeringValue>(`/engineering-values/${valueId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); }
+  assignEngineeringValueComponent(valueId: string, componentId: string) { return this.request<EngineeringValue>(`/engineering-values/${valueId}`, { method: 'PATCH', body: JSON.stringify({ componentId }) }); }
+  updateDocumentMetadata(documentId: string, input: { componentId?: string | null }) { return this.request<DocumentRecord>(`/documents/${documentId}`, { method: 'PUT', body: JSON.stringify(input) }); }
   listModules() { return this.request<EngineeringModule[]>('/engineering-modules'); }
   listDocuments(projectId: string) { return this.request<DocumentRecord[]>(`/documents?projectId=${projectId}`); }
   async uploadDocument(projectId: string, file: File, documentType: string) {
@@ -41,7 +43,7 @@ export class ApiClient {
     return response.json() as Promise<DocumentRecord>;
   }
   hydraulicPowerKw(input: { projectId: string; flowLpm: number; pressureBar: number; efficiency: number }) { return this.request<HydraulicPowerResponse>('/calculations/hydraulic-power-kw', { method: 'POST', body: JSON.stringify(input) }); }
-  extractValues(input: { projectId: string; documentId: string; extractionTarget?: { componentType?: string; moduleType?: string } }) { return this.request<ExtractionResult>('/extractions', { method: 'POST', body: JSON.stringify(input) }); }
+  extractValues(input: { projectId: string; documentId: string; componentId?: string; extractionTarget?: { componentType?: string; moduleType?: string } }) { return this.request<ExtractionResult>('/extractions', { method: 'POST', body: JSON.stringify(input) }); }
   listExtractionAttempts(projectId: string, documentId: string) { return this.request<ExtractionAttempt[]>(`/extractions/attempts?projectId=${projectId}&documentId=${documentId}`); }
   generateReportSection(input: { projectId: string; componentId?: string; sectionType: 'component_summary' | 'calculation_summary' | 'assumptions_and_warnings' | 'missing_information' | 'source_references'; engineeringValues: EngineeringValue[]; missingInformation?: string[]; assumptions?: string[]; warnings?: string[] }) { return this.request<ReportSection>('/report-sections/generate', { method: 'POST', body: JSON.stringify(input) }); }
   listReportSections(projectId: string) { return this.request<ReportSection[]>(`/report-sections?projectId=${projectId}`); }

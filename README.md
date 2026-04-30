@@ -213,3 +213,10 @@ EXTRACTION_PROVIDER=mock npm run start --workspace @ommatidia/api
 - If diagnostics show a high suspicious/internal ratio, extracted text likely contains PDF internals instead of visible text.
 - In OpenAI provider mode, the system now attempts a vision/file fallback for PDFs/images.
 - If fallback is unavailable, extraction warns: "This PDF needs vision/OCR extraction, but no vision fallback is configured."
+
+## Component-specific extraction and review workflow (Task 17A)
+- Assign each uploaded document to a component from the Documents section.
+- Extraction requests now include the selected component when available.
+- Extracted values are saved under that component and remain `needs_review`/`ai_extracted` until user approval.
+- Unassigned extraction remains supported and appears under **Unassigned extracted values**.
+- Review actions beside candidate values: **Approve**, **Reject**, and **Assign to component**.

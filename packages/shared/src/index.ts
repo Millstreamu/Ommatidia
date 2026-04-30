@@ -42,7 +42,7 @@ export type SourceReference = zInfer<typeof sourceReferenceSchema>;
 export const projectSchema = z.object({ id: z.string(), name: z.string(), description: z.string().optional(), projectType: z.string(), createdAt: z.string(), updatedAt: z.string() });
 export type Project = zInfer<typeof projectSchema>;
 
-export const documentSchema = z.object({ id: z.string(), projectId: z.string(), originalFilename: z.string(), storedFilename: z.string(), mimeType: z.string(), fileSizeBytes: z.number(), documentType: documentTypeSchema, uploadStatus: documentUploadStatusSchema, processingStatus: documentProcessingStatusSchema, createdAt: z.string(), updatedAt: z.string() });
+export const documentSchema = z.object({ id: z.string(), projectId: z.string(), componentId: z.string().optional(), originalFilename: z.string(), storedFilename: z.string(), mimeType: z.string(), fileSizeBytes: z.number(), documentType: documentTypeSchema, uploadStatus: documentUploadStatusSchema, processingStatus: documentProcessingStatusSchema, createdAt: z.string(), updatedAt: z.string() });
 export type Document = zInfer<typeof documentSchema>;
 
 export const componentSchema = z.object({ id: z.string(), projectId: z.string(), name: z.string(), type: z.string(), description: z.string().optional(), createdAt: z.string(), updatedAt: z.string() });
