@@ -44,6 +44,7 @@ Users can export saved report sections to a Microsoft Word `.docx` document from
 - The web UI prioritizes clarity for non-technical users with a stable header, simple navigation, and workflow-oriented sections.
 - Project details are grouped into predictable sections: Project overview, Components, Engineering values, Documents, AI extraction, Calculations, Report sections, and Word export.
 - Documents in project and component views include an Open action that navigates to a dedicated document detail page with metadata and back navigation.
+- Document detail pages include extraction attempt history with collapsed diagnostics so project overviews stay compact while preserving deep troubleshooting context.
 - Engineering values always display explicit status badges (`user_entered`, `approved`, `needs_review`, `ai_extracted`, `rejected`, `superseded`) and keep unapproved values visible for reviewer action.
 - AI extraction UX must show loading, success, normalized friendly errors, and retryability where supported.
 - Calculations stay deterministic and show formula name, units, assumptions, warnings, and result readability.
