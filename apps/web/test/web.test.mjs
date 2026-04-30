@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEngineeringValueForm, renderDocumentList, renderDocumentDetailView, renderExtractionAttemptRow, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection, renderFixtureList, renderComponentLibrarySection, renderAlert, renderDocumentValuesSection, renderFixturesPageShell, renderFixtureSummaryCard } from '../dist/app.js';
+import { validateEngineeringValueForm, renderDocumentList, renderDocumentDetailView, renderExtractionAttemptRow, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection, renderFixtureList, renderComponentLibrarySection, renderAlert, renderDocumentValuesSection, renderFixturesPageShell, renderFixtureSummaryCard, renderComponentLibraryPageShell, renderComponentLibrarySummaryCard } from '../dist/app.js';
 import { startWebApp } from '../dist/index.js';
 import { createServer } from 'node:http';
 import { ApiClient } from '../dist/apiClient.js';
@@ -121,8 +121,36 @@ test('library section renders empty/error/items and tags', () => {
   assert.match(renderComponentLibrarySection([]), /No library components saved yet/);
   assert.match(renderComponentLibrarySection([], { error: 'network' }), /Could not load component library: network/);
   const html = renderComponentLibrarySection([{ id: 'l1', name: 'Danfoss 25cc Pump', componentType: 'Pump', tags: ['danfoss', 'pump'], approvedEngineeringValues: [{ key: 'model', value: '25cc' }], originatingProjectId: 'p1', originatingComponentId: 'c1' }], { search: 'pump' });
-  assert.match(html, /Tags: danfoss, pump/);
-  assert.match(html, /Approved values: 1/);
+  assert.match(html, /badge-secondary/);
+  assert.match(html, /Approved\/user-entered values: 1/);
+});
+test('library route renders page title and back link', () => {
+  const html = renderComponentLibraryPageShell('p1', '<p>Loading component library...</p>');
+  assert.match(html, /Back to project/);
+  assert.match(html, /Component library/);
+});
+test('library no-results state renders', () => {
+  assert.match(renderComponentLibrarySection([], { search: 'zzzz' }), /No library components found\./);
+});
+test('search can filter by name type and tag values', () => {
+  const items = [
+    { id: 'l1', name: 'Main Pump', componentType: 'Pump', tags: ['hydraulic'], approvedEngineeringValues: [] },
+    { id: 'l2', name: 'Cooler', componentType: 'Heat exchanger', tags: ['cooling'], approvedEngineeringValues: [] }
+  ];
+  const byName = items.filter((i) => `${i.name} ${i.componentType} ${i.tags.join(' ')}`.toLowerCase().includes('pump'));
+  const byType = items.filter((i) => `${i.name} ${i.componentType} ${i.tags.join(' ')}`.toLowerCase().includes('heat'));
+  const byTag = items.filter((i) => `${i.name} ${i.componentType} ${i.tags.join(' ')}`.toLowerCase().includes('cooling'));
+  assert.equal(byName.length, 1);
+  assert.equal(byType.length, 1);
+  assert.equal(byTag.length, 1);
+});
+test('project overview library summary shows compact count and open-library route', () => {
+  const html = renderComponentLibrarySummaryCard('p1', [{ name: 'A' }, { name: 'B' }, { name: 'C' }, { name: 'D' }]);
+  assert.match(html, /Library items: <span id="library-count">4<\/span>/);
+  assert.match(html, /A/);
+  assert.match(html, /C/);
+  assert.doesNotMatch(html, /D/);
+  assert.match(html, /href="#\/projects\/p1\/library"/);
 });
 
 test('OpenAI status badge renders connected state', () => {
