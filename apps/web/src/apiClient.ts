@@ -5,7 +5,7 @@ export interface Component { id: string; projectId: string; name: string; type: 
 export interface EngineeringValue { id: string; projectId: string; componentId?: string; key: string; label: string; value: number | string | boolean; valueType: string; unit?: string; status: string; createdAt: string; updatedAt: string; }
 export interface EngineeringModule { id: string; name: string; description: string; moduleType: string; }
 export interface DocumentRecord { id: string; projectId: string; componentId?: string; originalFilename: string; storedFilename: string; mimeType: string; fileSizeBytes: number; documentType: string; uploadStatus: string; processingStatus: string; createdAt: string; updatedAt: string; }
-export interface SystemStatus { ok: boolean; extractionProvider: 'openai' | 'mock' | 'unknown'; openAiConfigured: boolean; openAiModel?: string; apiProxyMode: boolean; timestamp: string; }
+export interface SystemStatus { ok: boolean; extractionProvider: 'openai' | 'mock' | 'fixture' | 'unknown'; openAiConfigured: boolean; openAiModel?: string; apiProxyMode: boolean; timestamp: string; }
 export interface OpenAiSmokeTestResult { ok: boolean; provider: 'openai'; model: string; openAiConfigured: boolean; statusCode?: number; message: string; timestamp: string; }
 
 export interface HydraulicPowerResponse { moduleId: string; projectId: string; inputsUsed: Array<{ key: string; label: string; value: number | string | boolean; valueType: string; unit?: string }>; outputs: Array<{ key: string; label: string; value: number | string | boolean; valueType: string; unit?: string }>; warnings: string[]; assumptions: string[]; createdAt: string; }
@@ -24,7 +24,7 @@ export class ApiClient {
   private async request<T>(path: string, init?: RequestInit): Promise<T> { let response: Response; try { response = await fetch(`${this.baseUrl}${path}`, { ...init, headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) } }); } catch (error) { throw toHelpfulNetworkError(error); } if (!response.ok) { let body: any = undefined; try { body = await response.json(); } catch {} const err = new Error(body?.message ?? `API request failed (${response.status})`) as Error & { extractionError?: ExtractionErrorResponse }; if (body?.errorCode) err.extractionError = body as ExtractionErrorResponse; throw err; } return response.json() as Promise<T>; }
   listProjects() { return this.request<Project[]>('/projects'); }
   getSystemStatus() { return this.request<SystemStatus>('/system/status'); }
-  updateExtractionProvider(extractionProvider: 'mock' | 'openai') { return this.request<SystemStatus>('/system/extraction-provider', { method: 'PATCH', body: JSON.stringify({ extractionProvider }) }); }
+  updateExtractionProvider(extractionProvider: 'mock' | 'fixture' | 'openai') { return this.request<SystemStatus>('/system/extraction-provider', { method: 'PATCH', body: JSON.stringify({ extractionProvider }) }); }
   testOpenAi() { return this.request<OpenAiSmokeTestResult>('/system/openai-smoke-test'); }
   createProject(input: { name: string; description?: string; projectType: string }) { return this.request<Project>('/projects', { method: 'POST', body: JSON.stringify(input) }); }
   getProject(projectId: string) { return this.request<Project>(`/projects/${projectId}`); }
@@ -43,7 +43,7 @@ export class ApiClient {
     return response.json() as Promise<DocumentRecord>;
   }
   hydraulicPowerKw(input: { projectId: string; flowLpm: number; pressureBar: number; efficiency: number }) { return this.request<HydraulicPowerResponse>('/calculations/hydraulic-power-kw', { method: 'POST', body: JSON.stringify(input) }); }
-  extractValues(input: { projectId: string; documentId: string; componentId?: string; extractionTarget?: { componentType?: string; moduleType?: string } }) { return this.request<ExtractionResult>('/extractions', { method: 'POST', body: JSON.stringify(input) }); }
+  extractValues(input: { projectId: string; documentId: string; componentId?: string; fixtureId?: string; extractionTarget?: { componentType?: string; moduleType?: string } }) { return this.request<ExtractionResult>('/extractions', { method: 'POST', body: JSON.stringify(input) }); }
   listExtractionAttempts(projectId: string, documentId: string) { return this.request<ExtractionAttempt[]>(`/extractions/attempts?projectId=${projectId}&documentId=${documentId}`); }
 
   saveExtractionFixture(input: { name: string; originalFilename: string; documentType: string; componentType?: string; componentName?: string; candidateValues: EngineeringValue[]; warnings: string[] }) { return this.request<ExtractionFixture>('/extraction-fixtures', { method: 'POST', body: JSON.stringify(input) }); }

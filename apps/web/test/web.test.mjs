@@ -73,6 +73,7 @@ test('extraction provider controls render provider state and credit note', () =>
 test('extraction provider controls disable OpenAI when key missing', () => {
   const html = renderExtractionProviderControls({ ok: true, extractionProvider: 'mock', openAiConfigured: false, apiProxyMode: true, timestamp: new Date().toISOString() });
   assert.match(html, /OpenAI key missing/);
+  assert.match(html, /option value="fixture"/);
   assert.match(html, /option value="openai"[^>]*disabled/);
 });
 

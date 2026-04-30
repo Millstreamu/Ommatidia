@@ -74,3 +74,6 @@
 - Vision/file extracted values must remain `needs_review` or `ai_extracted` until user approval.
 
 - Component-specific extraction does not change review safety: all AI-created engineering values remain `needs_review`/`ai_extracted` until a user explicitly approves them.
+
+- Fixture replay mode is test-data playback only; it is not a new AI extraction event and must be labeled separately from OpenAI extraction attempts.
+- Fixture replay must not call OpenAI and must not consume OpenAI credits/tokens.
