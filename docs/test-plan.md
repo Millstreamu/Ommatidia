@@ -249,3 +249,9 @@ Package-focused (optional):
 - [x] Task 17A: documents can be assigned/reassigned to a component from UI and API.
 - [x] Task 17A: candidate review controls support approve/reject/assign actions.
 - [x] Task 17A: extraction success refreshes engineering values and attempt details include created candidate keys.
+
+- [x] Task 19B: project detail screen is organized into workflow cards with quick stats and two-column responsive layout.
+- [x] Task 19B: selected component data area keeps approved/needs-review/rejected value groups and unassigned values visible with assign/approve/reject actions.
+- [x] Task 19B: document diagnostics are hidden in collapsible details by default.
+- [x] Task 19B: fixtures card supports loading/empty/error/list states and explicit replay flow cues.
+- [x] Task 19B: library card keeps search input and promote/copy actions accessible.

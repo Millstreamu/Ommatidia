@@ -311,9 +311,9 @@ test('UI diagnostics includes file/vision fallback called field', () => {
 });
 
 test('fixture list renders loading/empty/error/saved states', () => {
-  assert.equal(renderFixtureList([], { loading: true }), 'Loading fixtures...');
-  assert.equal(renderFixtureList([]), 'No fixtures saved yet.');
-  assert.equal(renderFixtureList([], { error: 'network down' }), 'Could not load fixtures: network down');
+  assert.match(renderFixtureList([], { loading: true }), /Loading fixtures/);
+  assert.match(renderFixtureList([]), /No fixtures saved yet/);
+  assert.match(renderFixtureList([], { error: 'network down' }), /Could not load fixtures: network down/);
   const html = renderFixtureList([{ fixtureId: 'f1', name: 'Danfoss pump extraction', originalFilename: 'Danfoss-product-details-2026-04-28.pdf', candidateValues: [{ key: 'pressure' }], componentName: 'Danfoss Pump', createdAt: '2026-04-28T00:00:00.000Z' }]);
   assert.match(html, /Danfoss pump extraction/);
   assert.match(html, /1 values/);
