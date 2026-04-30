@@ -101,6 +101,7 @@ This test plan defines acceptance criteria and validation strategy for existing 
 - [ ] Setup prepares `storage/uploads` for local development uploads.
 - [ ] One command starts API + web together for development.
 - [ ] One command runs typecheck + tests.
+- [ ] Update command safely stops local dev API process, refuses pull on dirty tree, then pulls/builds/checks without deleting `.env`, uploads, or fixtures.
 - [ ] Clean command removes build outputs without deleting `.env` or uploads.
 - [ ] Reset-local command (if used) clearly warns and only clears local dev upload data.
 
@@ -196,6 +197,7 @@ This test plan defines acceptance criteria and validation strategy for existing 
 | One-command setup + safe .env initialization | Covered by manual command verification |
 | One-command API+web start for local dev | Covered by manual command verification |
 | One-command typecheck+test (`check`) | Covered by manual command verification + existing CI-style commands |
+| One-command update (`update`) safely stops/pulls/builds/checks and preserves `.env`, uploads, and fixtures | Covered by script behavior review + manual command verification |
 | Clean preserves .env and uploads | Covered by script behavior review + manual command verification |
 | Reset-local only clears local uploads and preserves .env | Covered by manual command verification |
 

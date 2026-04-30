@@ -17,6 +17,13 @@ make setup
 make start
 ```
 
+After pulling new Codex changes, run:
+
+```bash
+make update
+make start
+```
+
 Useful follow-up commands:
 
 ```bash
@@ -31,6 +38,7 @@ make reset-local
 ```bash
 npm run setup
 npm run start
+npm run update
 npm run check
 npm run test
 npm run clean
@@ -43,8 +51,11 @@ npm run reset-local
 test -n "$OPENAI_API_KEY" && echo "OPENAI_API_KEY is set" || echo "OPENAI_API_KEY is missing"
 ```
 
+
 Notes:
 - `setup` installs dependencies, creates `.env` from `.env.example` only when `.env` is missing, and prepares `storage/uploads/`.
+- `update` safely stops the local API dev process pattern (`node dist/index.js`), checks for uncommitted changes before pulling, runs `git pull`, installs dependencies, builds, and runs checks.
+- `update` does **not** delete `.env`, uploaded documents in `storage/uploads`, or fixtures.
 - `start` launches API and web together for local development.
 - Default local URLs: Web `http://localhost:3000` (opening this URL shows the Projects page by default). The web app proxies same-origin `/api/*` requests to the API server at `http://127.0.0.1:3001/*`.
 - `reset-local` deletes local development uploads in `storage/uploads` and recreates the folder; it does not delete `.env`.
@@ -60,6 +71,13 @@ Notes:
 - OpenAI mode may use API credits when extraction is run.
 - API keys remain server-side only; the UI never stores or displays keys.
 
+
+### Common development loop
+
+After Codex changes:
+1. `make update`
+2. `make start`
+3. Refresh browser port `3000`
 
 ### Troubleshooting web/API connection in Codespaces
 
