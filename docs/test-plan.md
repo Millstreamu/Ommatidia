@@ -58,6 +58,7 @@ This test plan defines acceptance criteria and validation strategy for existing 
 ### Extraction fixtures and replay (Task 17B/17C)
 - [ ] User can save a successful extraction result as a test fixture.
 - [ ] Fixture list shows name, filename, value count, and created date.
+- [ ] Fixtures page route `#/projects/:projectId/fixtures` renders back link, title, helper text, and one clear list state (loading, empty, error, or list).
 - [ ] Fixture list state machine shows exactly one state: loading, empty, error, or list.
 - [ ] Fixture save sanitizes secret-like fields and excludes full raw document text by default.
 - [ ] Fixture list/get/delete API routes work without OpenAI calls.
@@ -158,6 +159,7 @@ This test plan defines acceptance criteria and validation strategy for existing 
 | Web root route (`/`) serves Projects UI shell | Covered by UI test |
 | Browser API calls use same-origin `/api` and web server strips `/api` when proxying to API on 3001 | Covered by UI/web proxy tests |
 | Projects empty/list rendering states | Covered by UI test |
+| Dedicated fixtures page shell + compact overview summary card | Covered by UI rendering tests |
 | Project details workflow section headings | Covered by UI test |
 | Engineering status badge rendering | Covered by UI test |
 | System status badge states (openai connected/missing, mock, unavailable) | Covered by API + UI tests |
