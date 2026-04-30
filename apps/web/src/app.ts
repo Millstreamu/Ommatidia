@@ -111,6 +111,30 @@ export function renderDocumentDetailView(options: { projectId: string; document:
   const { projectId, document, componentName, apiBaseUrl } = options;
   return `<p><a href="#/projects/${projectId}">Back to project</a></p><h2>Document detail</h2><p><strong>Filename:</strong> ${escapeHtml(document.originalFilename)}</p><p><strong>Document type:</strong> ${escapeHtml(document.documentType)}</p><p><strong>File size:</strong> ${document.fileSizeBytes} bytes</p><p><strong>Status:</strong> ${escapeHtml(document.uploadStatus)} / ${escapeHtml(document.processingStatus)}</p><p><strong>Assigned component:</strong> ${escapeHtml(componentName ?? 'Unassigned')}</p><p><a href="${apiBaseUrl}/documents/${document.id}/file" target="_blank" rel="noreferrer">View file</a></p><section><h3>Extraction attempts</h3><p id="document-attempts-summary">Loading extraction attempts…</p><ul id="document-extract-attempts"></ul></section>`;
 }
+
+export function renderDocumentValuesSection(options: { values: UiEngineeringValue[]; components: UiComponent[] }): string {
+  const { values, components } = options;
+  if (!values.length) {
+    return `<section><h3>Values from this document</h3><p>No values have been created from this document yet.</p></section>`;
+  }
+  const componentById = new Map(components.map((component) => [component.id, component.name]));
+  const renderRows = (rows: UiEngineeringValue[]): string => rows.map((value) => {
+    const componentName = value.componentId ? (componentById.get(value.componentId) ?? 'Unknown component') : 'Unassigned';
+    const assignControl = !value.componentId
+      ? `<select data-doc-assign-value-id="${value.id}"><option value="">Select component</option>${components.map((component) => `<option value="${component.id}">${component.name}</option>`).join('')}</select> <button data-doc-assign-action-id="${value.id}">Assign</button>`
+      : '';
+    const statusControls = NEEDS_REVIEW_STATUSES.has(value.status)
+      ? `<button data-status-id="${value.id}" data-status="approved">Approve</button> <button data-status-id="${value.id}" data-status="rejected">Reject</button>`
+      : '';
+    return `<tr><td>${escapeHtml(value.label)}</td><td>${escapeHtml(String(value.value))}</td><td>${escapeHtml(value.unit ?? '')}</td><td>${renderStatusBadge(value.status)}</td><td>${escapeHtml(componentName)}</td><td>${assignControl}${assignControl && statusControls ? ' ' : ''}${statusControls}</td></tr>`;
+  }).join('');
+
+  const assigned = components.map((component) => ({ component, values: values.filter((value) => value.componentId === component.id) })).filter((entry) => entry.values.length > 0);
+  const unassigned = values.filter((value) => !value.componentId);
+
+  return `<section><h3>Values from this document</h3>${assigned.map((entry) => `<h4>Component: ${escapeHtml(entry.component.name)}</h4><table><thead><tr><th>Field</th><th>Value</th><th>Unit</th><th>Status</th><th>Component</th><th>Actions</th></tr></thead><tbody>${renderRows(entry.values)}</tbody></table>`).join('')}${unassigned.length ? `<h4>Unassigned</h4><table><thead><tr><th>Field</th><th>Value</th><th>Unit</th><th>Status</th><th>Component</th><th>Actions</th></tr></thead><tbody>${renderRows(unassigned)}</tbody></table>` : ''}<div id="document-values-error" style="color:#b91c1c;font-weight:600;"></div></section>`;
+}
+
 export function renderExtractionAttemptRow(attempt: { status: string; provider: string; valuesCreatedCount: number; errorCode?: string; safeErrorMessage?: string; warnings?: string[]; diagnostics?: Record<string, unknown>; startedAt?: string; completedAt?: string; createdCandidateKeys?: string[] }): string {
   const droppedSummary = renderDroppedCandidateWarnings(attempt);
   const diag = renderExtractionDiagnostics(attempt);
@@ -131,7 +155,7 @@ export function renderProjectsView(projects: Array<{ id: string; name: string; d
 }
 
 type UiComponent = { id: string; name: string; type: string };
-type UiEngineeringValue = { id: string; componentId?: string; label: string; value: number | string | boolean; unit?: string; status: string };
+type UiEngineeringValue = { id: string; componentId?: string; documentId?: string; label: string; value: number | string | boolean; unit?: string; status: string };
 type UiFixture = { fixtureId: string; name: string; originalFilename: string; candidateValues: unknown[]; componentName?: string; createdAt: string };
 const APPROVED_STATUSES = new Set(['approved', 'user_entered']);
 const NEEDS_REVIEW_STATUSES = new Set(['needs_review', 'ai_extracted']);
@@ -330,7 +354,8 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
           return;
         }
         const componentName = components.find((c) => c.id === document.componentId)?.name;
-        view.innerHTML = renderDocumentDetailView({ projectId, document, componentName, apiBaseUrl });
+        const documentValues = values.filter((value) => (value as UiEngineeringValue).documentId === document.id);
+        view.innerHTML = `${renderDocumentDetailView({ projectId, document, componentName, apiBaseUrl })}${renderDocumentValuesSection({ values: documentValues, components })}`;
       } else if (isComponentRoute || isUnassignedRoute) {
         const component = isUnassignedRoute ? undefined : components.find((c) => c.id === parts[3]);
         if (!isUnassignedRoute && !component) {
@@ -420,17 +445,18 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
         if (attemptsEl) attemptsEl.innerHTML = attempts.map((attempt) => renderExtractionAttemptRow(attempt)).join('');
       }
       view.querySelectorAll<HTMLButtonElement>('button[data-retry-doc-id]').forEach((btn) => { btn.onclick = () => { view.querySelector<HTMLButtonElement>(`button[data-extract-doc-id="${btn.dataset.retryDocId!}"]`)?.click(); }; });
-      view.querySelectorAll<HTMLButtonElement>('button[data-status-id]').forEach((btn) => { btn.onclick = async () => { const errEl = view.querySelector('#engineering-values-error') as HTMLElement | null; btn.disabled = true; if (errEl) errEl.textContent = ''; try { await client.updateEngineeringValueStatus(btn.dataset.statusId!, btn.dataset.status as 'approved' | 'rejected'); await load(); } catch (error) { if (errEl) errEl.textContent = `Could not update status: ${(error as Error).message}`; btn.disabled = false; } }; });
+      view.querySelectorAll<HTMLButtonElement>('button[data-status-id]').forEach((btn) => { btn.onclick = async () => { const errEl = (view.querySelector('#engineering-values-error') ?? view.querySelector('#document-values-error')) as HTMLElement | null; btn.disabled = true; if (errEl) errEl.textContent = ''; try { await client.updateEngineeringValueStatus(btn.dataset.statusId!, btn.dataset.status as 'approved' | 'rejected'); await load(); } catch (error) { if (errEl) errEl.textContent = `Could not update status: ${(error as Error).message}`; btn.disabled = false; } }; });
       view.querySelectorAll<HTMLSelectElement>('select[data-document-component-id]').forEach((select) => {
         select.onchange = async () => {
           await client.updateDocumentMetadata(select.dataset.documentComponentId!, { componentId: select.value || undefined });
         };
       });
-      view.querySelectorAll<HTMLButtonElement>('button[data-assign-action-id]').forEach((btn) => {
+      view.querySelectorAll<HTMLButtonElement>('button[data-assign-action-id], button[data-doc-assign-action-id]').forEach((btn) => {
         btn.onclick = async () => {
-          const errEl = view.querySelector('#engineering-values-error') as HTMLElement | null;
-          const valueId = btn.dataset.assignActionId!;
-          const select = view.querySelector(`select[data-assign-value-id="${valueId}"]`) as HTMLSelectElement | null;
+          const errEl = (view.querySelector('#engineering-values-error') ?? view.querySelector('#document-values-error')) as HTMLElement | null;
+          const valueId = btn.dataset.assignActionId ?? btn.dataset.docAssignActionId;
+          if (!valueId) return;
+          const select = view.querySelector(`select[data-assign-value-id="${valueId}"], select[data-doc-assign-value-id="${valueId}"]`) as HTMLSelectElement | null;
           if (!select?.value) return;
           btn.disabled = true;
           if (errEl) errEl.textContent = '';
