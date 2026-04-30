@@ -79,3 +79,8 @@
 
 - Fixture replay mode is test-data playback only; it is not a new AI extraction event and must be labeled separately from OpenAI extraction attempts.
 - Fixture replay must not call OpenAI and must not consume OpenAI credits/tokens.
+
+## Runtime settings key safety (Task 20)
+- OpenAI API keys must remain server-side and must never be returned by API responses.
+- UI must never display full/partial keys and must not store keys in browser localStorage.
+- Local runtime settings secret files must be gitignored (`storage/local-settings.json` / `storage/secrets/`).

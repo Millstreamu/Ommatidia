@@ -257,3 +257,10 @@ Package-focused (optional):
 - Status badges map to status-specific class variants (`approved`, `user_entered`, `needs_review`, `ai_extracted`, `rejected`, `superseded`).
 - Alert variants (`info`, `success`, `warning`, `error`) produce predictable class names.
 - Existing extraction/provider workflows still pass existing UI tests.
+
+### Settings runtime key management (Task 20)
+- [ ] User can open Settings page from header nav.
+- [ ] User can save runtime OpenAI key without seeing key in UI or API responses.
+- [ ] Runtime key source is shown as runtime/environment/none.
+- [ ] Clearing runtime key falls back to environment key when present.
+- [ ] Smoke test and extraction use runtime key when present.
