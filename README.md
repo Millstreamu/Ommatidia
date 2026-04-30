@@ -214,6 +214,8 @@ EXTRACTION_PROVIDER=mock npm run start --workspace @ommatidia/api
 - Fixture save/list/get/delete endpoints run locally and do not call OpenAI.
 - Fixtures are intended for replay/testing workflows later so repeated UI/review/report tests can avoid token usage.
 - Fixtures are sanitized to exclude API keys/secrets and do not store full raw document text by default.
+- Switch provider to `Fixture` to replay a saved fixture into the current project/document/component.
+- Fixture replay is test data playback only and does not consume OpenAI credits/tokens.
 
 ## Troubleshooting PDF extraction
 

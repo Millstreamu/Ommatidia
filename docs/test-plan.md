@@ -55,7 +55,7 @@ This test plan defines acceptance criteria and validation strategy for existing 
 - [ ] Extraction diagnostics include extracted/useful text character counts, timeoutMs, and model-call flag.
 
 
-### Extraction fixtures (Task 17B)
+### Extraction fixtures and replay (Task 17B/17C)
 - [ ] User can save a successful extraction result as a test fixture.
 - [ ] Fixture list shows name, filename, value count, and created date.
 - [ ] Fixture save sanitizes secret-like fields and excludes full raw document text by default.
