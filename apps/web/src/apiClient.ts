@@ -5,7 +5,8 @@ export interface Component { id: string; projectId: string; name: string; type: 
 export interface EngineeringValue { id: string; projectId: string; componentId?: string; key: string; label: string; value: number | string | boolean; valueType: string; unit?: string; status: string; createdAt: string; updatedAt: string; }
 export interface EngineeringModule { id: string; name: string; description: string; moduleType: string; }
 export interface DocumentRecord { id: string; projectId: string; componentId?: string; originalFilename: string; storedFilename: string; mimeType: string; fileSizeBytes: number; documentType: string; uploadStatus: string; processingStatus: string; createdAt: string; updatedAt: string; }
-export interface SystemStatus { ok: boolean; extractionProvider: 'openai' | 'mock' | 'fixture' | 'unknown'; openAiConfigured: boolean; openAiModel?: string; apiProxyMode: boolean; timestamp: string; }
+export interface SystemStatus { ok: boolean; extractionProvider: 'openai' | 'mock' | 'fixture' | 'unknown'; openAiConfigured: boolean; openAiKeySource?: 'runtime'|'environment'|'none'; openAiModel?: string; apiProxyMode: boolean; timestamp: string; }
+export interface SystemSettings { openAiConfigured: boolean; openAiKeySource: 'runtime'|'environment'|'none'; extractionProvider: 'openai'|'mock'|'fixture'; openAiModel: string; timeoutMs: number; }
 export interface OpenAiSmokeTestResult { ok: boolean; provider: 'openai'; model: string; openAiConfigured: boolean; statusCode?: number; message: string; timestamp: string; }
 
 export interface HydraulicPowerResponse { moduleId: string; projectId: string; inputsUsed: Array<{ key: string; label: string; value: number | string | boolean; valueType: string; unit?: string }>; outputs: Array<{ key: string; label: string; value: number | string | boolean; valueType: string; unit?: string }>; warnings: string[]; assumptions: string[]; createdAt: string; }
@@ -26,6 +27,9 @@ export class ApiClient {
   getSystemStatus() { return this.request<SystemStatus>('/system/status'); }
   updateExtractionProvider(extractionProvider: 'mock' | 'fixture' | 'openai') { return this.request<SystemStatus>('/system/extraction-provider', { method: 'PATCH', body: JSON.stringify({ extractionProvider }) }); }
   testOpenAi() { return this.request<OpenAiSmokeTestResult>('/system/openai-smoke-test'); }
+  getSystemSettings() { return this.request<SystemSettings>('/system/settings'); }
+  saveRuntimeOpenAiKey(apiKey: string) { return this.request<SystemSettings>('/system/settings/openai-key', { method: 'PATCH', body: JSON.stringify({ apiKey }) }); }
+  clearRuntimeOpenAiKey() { return this.request<SystemSettings>('/system/settings/openai-key', { method: 'DELETE' }); }
   createProject(input: { name: string; description?: string; projectType: string }) { return this.request<Project>('/projects', { method: 'POST', body: JSON.stringify(input) }); }
   getProject(projectId: string) { return this.request<Project>(`/projects/${projectId}`); }
   listComponents(projectId: string) { return this.request<Component[]>(`/components?projectId=${projectId}`); }

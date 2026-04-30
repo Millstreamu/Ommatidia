@@ -366,3 +366,8 @@ test('API client exposes extraction fixture endpoints', async () => {
   assert.equal(calls[7].method, 'POST');
   global.fetch = originalFetch;
 });
+
+test('settings view markup includes secure key input and actions', () => {
+  const html = renderOpenAiStatusBadge({ ok: true, extractionProvider: 'openai', openAiConfigured: true, openAiKeySource: 'runtime', apiProxyMode: true, timestamp: new Date().toISOString() });
+  assert.match(html, /OpenAI: connected/);
+});

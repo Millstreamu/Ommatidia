@@ -261,3 +261,10 @@ EXTRACTION_PROVIDER=mock npm run start --workspace @ommatidia/api
 - Extracted values are saved under that component and remain `needs_review`/`ai_extracted` until user approval.
 - Unassigned extraction remains supported and appears under **Unassigned extracted values**.
 - Review actions beside candidate values: **Approve**, **Reject**, and **Assign to component**.
+
+## Settings tab: runtime OpenAI key (local dev only)
+- Open **Settings** in the app header to paste an OpenAI API key without editing `.env`.
+- The key is stored server-side in `storage/local-settings.json` for local/dev use only.
+- This file is gitignored. Never commit or share it.
+- Existing `.env` / Codespaces `OPENAI_API_KEY` still works; runtime key takes priority.
+- If `.env` was accidentally tracked, untrack it with: `git rm --cached .env`.

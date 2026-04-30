@@ -1,4 +1,4 @@
-import { ApiClient, type SystemStatus } from './apiClient.js';
+import { ApiClient, type SystemStatus, type SystemSettings } from './apiClient.js';
 
 
 export function resolveApiBaseUrl(_hostname: string): string {
@@ -205,9 +205,14 @@ export async function triggerReportSectionsDocxExport(client: ApiClient, input: 
   return url;
 }
 
+
+function renderSettingsView(settings: SystemSettings, message = '', error = ''): string {
+  const sourceLabel = settings.openAiKeySource === 'runtime' ? 'runtime settings' : settings.openAiKeySource === 'environment' ? 'environment' : 'not configured';
+  return `<h2>Settings</h2><section><h3>OpenAI connection</h3><p>OpenAI connected means a key is configured. Test OpenAI sends a tiny test request. Real extraction may use API credits.</p><ul><li>OpenAI key configured: <strong>${settings.openAiConfigured ? 'yes' : 'no'}</strong></li><li>Source: <strong>${sourceLabel}</strong></li><li>Current model: <strong>${settings.openAiModel}</strong></li></ul><form id="settings-openai-form"><input name="apiKey" type="password" placeholder="Paste OpenAI API key" required autocomplete="off"/><button>Save key</button></form><button id="settings-clear-openai" type="button">Clear runtime key</button> <button id="settings-test-openai" type="button">Test OpenAI</button>${message ? renderAlert(message,'success') : ''}${error ? renderAlert(error,'error') : ''}<div id="settings-test-status"></div></section><section><h3>Extraction provider</h3><p>${settings.extractionProvider}</p></section><section><h3>Developer/runtime info</h3><p>Timeout: ${settings.timeoutMs}ms</p></section>`;
+}
 export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
   const client = new ApiClient(apiBaseUrl);
-  root.innerHTML = `<header class="app-header"><div><h1 style="margin:0;">Engineering Design Assistant</h1><p class="header-subtitle">AI-assisted engineering drafts with deterministic calculations and review-first workflows.</p><nav id="top-nav" class="breadcrumbs">Projects / Current Project</nav></div><div id="system-status" class="card"></div></header><main id="view" class="container"></main>`;
+  root.innerHTML = `<header class="app-header"><div><h1 style="margin:0;">Engineering Design Assistant</h1><p class="header-subtitle">AI-assisted engineering drafts with deterministic calculations and review-first workflows.</p><nav id="top-nav" class="breadcrumbs"><a href="#/">Projects</a> / <a href="#/settings">Settings</a></nav></div><div id="system-status" class="card"></div></header><main id="view" class="container"></main>`;
   const view = root.querySelector('#view') as HTMLElement;
   const nav = root.querySelector('#top-nav') as HTMLElement;
   const statusContainer = root.querySelector('#system-status') as HTMLElement;
@@ -253,6 +258,19 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
 
   const load = async () => {
     const hash = window.location.hash;
+    if (hash === '#/settings') {
+      nav.innerHTML = '<a href="#/">Projects</a> / <strong>Settings</strong>';
+      const settings = await client.getSystemSettings();
+      view.innerHTML = renderSettingsView(settings);
+      const bindSettingsActions = (current: SystemSettings) => {
+        const form = view.querySelector('#settings-openai-form') as HTMLFormElement;
+        form.onsubmit = async (e) => { e.preventDefault(); const key = String(new FormData(form).get('apiKey') ?? ''); const updated = await client.saveRuntimeOpenAiKey(key); form.reset(); view.innerHTML = renderSettingsView(updated, 'OpenAI key saved for this local app'); bindSettingsActions(updated); await refreshSystemStatus(); };
+        (view.querySelector('#settings-clear-openai') as HTMLButtonElement).onclick = async () => { const updated = await client.clearRuntimeOpenAiKey(); view.innerHTML = renderSettingsView(updated, 'Runtime OpenAI key cleared.'); bindSettingsActions(updated); await refreshSystemStatus(); };
+        (view.querySelector('#settings-test-openai') as HTMLButtonElement).onclick = async () => { const el = view.querySelector('#settings-test-status') as HTMLElement; el.textContent = 'Testing OpenAI...'; try { const result = await client.testOpenAi(); el.textContent = result.message; } catch (error) { el.textContent = `OpenAI test failed: ${(error as Error).message}`; } };
+      };
+      bindSettingsActions(settings);
+      return;
+    }
     if (hash.startsWith('#/projects/')) {
       const projectId = hash.split('/')[2];
       const [project, components, values, modules, documents, reportSections, library] = await Promise.all([

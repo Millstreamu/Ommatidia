@@ -330,3 +330,24 @@ test('fixture provider replays fixture values with regenerated ids/ownership and
   assert.equal(attempts[0].provider, 'fixture');
   assert.equal(attempts[0].diagnostics.fixtureId, fixture.fixtureId);
 }); });
+
+test('system settings endpoints never return API key and support runtime key lifecycle', async () => {
+  const prev = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = 'env-key';
+  try {
+    await withServer(async (base) => {
+      let res = await fetch(`${base}/system/settings`);
+      let body = await res.json();
+      assert.equal(body.openAiKeySource, 'environment');
+      assert.doesNotMatch(JSON.stringify(body), /env-key/);
+      res = await fetch(`${base}/system/settings/openai-key`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ apiKey: 'runtime-key' }) });
+      body = await res.json();
+      assert.equal(body.openAiKeySource, 'runtime');
+      res = await fetch(`${base}/system/settings/openai-key`, { method: 'DELETE' });
+      body = await res.json();
+      assert.equal(body.openAiKeySource, 'environment');
+    });
+  } finally {
+    if (prev === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = prev;
+  }
+});
