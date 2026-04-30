@@ -270,3 +270,21 @@ test('UI diagnostics includes file/vision fallback called field', () => {
   const text = renderExtractionDiagnostics({ warnings: [], diagnostics: { contentSentToModel: false, openAiFallback: { called: true }, pdfTextExtraction: { extractedCharacterCount: 10, usefulTextCharacterCount: 2, suspiciousInternalTextRatio: 0.9 } } });
   assert.match(text, /OpenAI file\/vision fallback called: yes/);
 });
+
+
+test('API client exposes extraction fixture endpoints', async () => {
+  const calls = [];
+  const originalFetch = global.fetch;
+  global.fetch = async (url, init={}) => { calls.push({ url: String(url), method: init.method ?? 'GET' }); return { ok: true, json: async () => ({ fixtureId:'f1', candidateValues:[], warnings:[], name:'x', originalFilename:'a.pdf', documentType:'datasheet', createdAt:new Date().toISOString() }) }; };
+  const client = new ApiClient('http://local');
+  await client.saveExtractionFixture({ name:'x', originalFilename:'a.pdf', documentType:'datasheet', candidateValues:[], warnings:[] });
+  await client.listExtractionFixtures();
+  await client.getExtractionFixture('f1');
+  await client.deleteExtractionFixture('f1');
+  assert.equal(calls[0].url, 'http://local/extraction-fixtures');
+  assert.equal(calls[0].method, 'POST');
+  assert.equal(calls[1].url, 'http://local/extraction-fixtures');
+  assert.equal(calls[2].url, 'http://local/extraction-fixtures/f1');
+  assert.equal(calls[3].method, 'DELETE');
+  global.fetch = originalFetch;
+});

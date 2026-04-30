@@ -12,6 +12,7 @@ const UPLOAD_DIR = path.resolve(process.cwd(), 'storage/uploads'); const MAX_UPL
 interface Repository<T extends { id: string }> { create(value: T): T; list(): T[]; getById(id: string): T | undefined; update(id: string, value: T): T | undefined; delete(id: string): boolean; }
 class InMemoryRepository<T extends { id: string }> implements Repository<T> { private store = new Map<string, T>(); create(value: T): T { this.store.set(value.id, value); return value; } list(): T[] { return Array.from(this.store.values()); } getById(id: string): T | undefined { return this.store.get(id); } update(id: string, value: T): T | undefined { if (!this.store.has(id)) return undefined; this.store.set(id, value); return value; } delete(id: string): boolean { return this.store.delete(id); } }
 interface ExtractionAttempt { id: string; projectId: string; documentId: string; provider: string; status: 'pending'|'succeeded'|'failed'; startedAt: string; completedAt?: string; errorCode?: ExtractionErrorCode; safeErrorMessage?: string; valuesCreatedCount: number; createdCandidateKeys?: string[]; warnings: string[]; diagnostics?: Record<string, unknown>; }
+interface ExtractionFixture { id: string; name: string; originalFilename: string; documentType: string; componentType?: string; componentName?: string; candidateValues: EngineeringValue[]; warnings: string[]; createdAt: string; }
 const projectCreateSchema = z.object({ name: z.string(), description: z.string().optional(), projectType: z.string() });
 const documentMetadataUpdateSchema = z.object({ documentType: documentTypeSchema.optional(), processingStatus: documentProcessingStatusSchema.optional(), uploadStatus: z.literal('uploaded').optional(), componentId: z.string().optional() });
 const componentCreateSchema = z.object({ projectId: z.string(), name: z.string(), type: z.string(), description: z.string().optional() });
@@ -27,6 +28,30 @@ const reportSectionUpdateSchema = z.object({ title: z.string().optional(), bodyM
 const reportDocxExportSchema = z.object({ projectId: z.string(), reportSectionIds: z.array(z.string()), documentTitle: z.string().optional(), generatedBy: z.string().optional(), generatedAt: z.string().optional(), includeSourceReferences: z.boolean().optional() });
 const extractionStartSchema = z.object({ projectId: z.string(), documentId: z.string(), componentId: z.string().optional(), extractionTarget: z.object({ componentType: z.string().optional(), moduleType: z.string().optional() }).optional() }); const calcSchema = z.object({ projectId: z.string(), flowLpm: z.number(), pressureBar: z.number(), efficiency: z.number() });
 const extractionProviderUpdateSchema = z.object({ extractionProvider: z.enum(['mock', 'openai']) });
+
+const extractionFixtureCreateSchema = z.object({
+  name: z.string(),
+  originalFilename: z.string(),
+  documentType: z.string(),
+  componentType: z.string().optional(),
+  componentName: z.string().optional(),
+  candidateValues: z.array(z.any()),
+  warnings: z.array(z.string())
+});
+function sanitizeFixtureValue(input: unknown): unknown {
+  if (Array.isArray(input)) return input.map(sanitizeFixtureValue);
+  if (input && typeof input === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+      if (/(api[_-]?key|token|authorization|secret)/i.test(k)) continue;
+      if (k === 'rawText' || k === 'rawDocumentText' || k === 'documentText') continue;
+      out[k] = sanitizeFixtureValue(v);
+    }
+    return out;
+  }
+  return input;
+}
+
 function readBody(req: IncomingMessage): Promise<unknown> { return new Promise((resolve, reject) => { let data = ''; req.on('data', (chunk) => data += chunk); req.on('end', () => { try { resolve(data ? JSON.parse(data) : {}); } catch { reject(new Error('Invalid JSON body')); } }); req.on('error', reject); }); }
 function readRawBody(req: IncomingMessage): Promise<Buffer> { return new Promise((resolve,reject)=>{ const chunks: Buffer[]=[]; let total=0; req.on('data',(chunk:Buffer)=>{ total += chunk.length; if (total > MAX_UPLOAD_SIZE_BYTES) { reject(new Error(`File exceeds max size of ${MAX_UPLOAD_SIZE_BYTES} bytes`)); req.destroy(); return;} chunks.push(chunk);}); req.on('end',()=>resolve(Buffer.concat(chunks))); req.on('error',reject); }); }
 function getAllowedOrigin(origin: string | undefined): string | undefined {
@@ -49,6 +74,7 @@ function isOpenAiConfigured(): boolean { return Boolean(process.env.OPENAI_API_K
 function createSafeSystemStatus(extractionProvider: 'mock' | 'openai') { return { ok: true, extractionProvider, openAiConfigured: isOpenAiConfigured(), openAiModel: getDefaultOpenAiExtractionModel(), extractionConfig: { timeoutMs: Number(process.env.EXTRACTION_TIMEOUT_MS ?? 120000), maxRetries: Number(process.env.EXTRACTION_MAX_RETRIES ?? 1) }, apiProxyMode: true, timestamp: new Date().toISOString() }; }
 
 export function createApiHandler(){ const projects=new InMemoryRepository<Project>(); const documents=new InMemoryRepository<Document>(); const components=new InMemoryRepository<Component>(); const values=new InMemoryRepository<EngineeringValue>(); const modules=new InMemoryRepository<EngineeringModule>(); const attempts = new InMemoryRepository<ExtractionAttempt>(); const reportSections = new InMemoryRepository<ReportSection>(); const componentLibrary = new InMemoryRepository<ComponentLibraryItem>(); const calculationResults: CalculationResult[] = []; let extractionProvider: 'mock' | 'openai' = resolveExtractionProvider() === 'openai' ? 'openai' : 'mock';
+const fixtures = new InMemoryRepository<ExtractionFixture>();
 const getExtractionService = () => createExtractionService(extractionProvider);
 return async function handler(req: IncomingMessage, res: ServerResponse){ const method=req.method??'GET'; const url=new URL(req.url??'/', 'http://localhost'); const {pathname,searchParams}=url; try {
 if(method==='OPTIONS'){ applyCorsHeaders(req, res); res.statusCode = 204; res.end(); return; }
@@ -63,6 +89,18 @@ if(method==='GET'&&/^\/projects\/[^/]+$/.test(pathname)){ const id=pathname.spli
 if(method==='POST'&&/^\/projects\/[^/]+\/documents$/.test(pathname)){ const projectId=pathname.split('/')[2]; if(!projects.getById(projectId)) return sendJson(req, res,404,{error:'Project not found'}); const mimeType=String(req.headers['content-type']||''); if(!ALLOWED_MIME_TYPES.has(mimeType)) return sendJson(req, res,400,normalizedExtractionError('unsupported_file_type','Unsupported file type.',false)); const documentType=documentTypeSchema.parse(String(req.headers['x-document-type']||'')); const originalFilename=path.basename(String(req.headers['x-filename']||'upload')); const ext = mimeType==='application/pdf'?'.pdf':mimeType==='image/png'?'.png':mimeType==='image/webp'?'.webp':'.jpg'; const storedFilename=`${Date.now()}-${randomUUID()}${ext}`; await mkdir(UPLOAD_DIR,{recursive:true}); const raw=await readRawBody(req); const storedPath=path.join(UPLOAD_DIR,storedFilename); await writeFile(storedPath,raw); const now=new Date().toISOString(); return sendJson(req, res,201,documents.create({id:randomUUID(),projectId,originalFilename,storedFilename,mimeType,fileSizeBytes:raw.length,documentType,uploadStatus:'uploaded',processingStatus:'uploaded',componentId:undefined,createdAt:now,updatedAt:now})); }
 if(method==='GET'&&pathname==='/documents'){ const projectId=searchParams.get('projectId'); return sendJson(req, res,200,projectId?documents.list().filter(d=>d.projectId===projectId):documents.list()); }
 if(method==='GET'&&pathname==='/extractions/attempts'){ const projectId=String(searchParams.get('projectId') ?? ''); const documentId=String(searchParams.get('documentId') ?? ''); return sendJson(req, res,200,attempts.list().filter((a)=>a.projectId===projectId&&a.documentId===documentId)); }
+
+if(method==='POST'&&pathname==='/extraction-fixtures'){
+  const payload = extractionFixtureCreateSchema.parse(await readBody(req));
+  const now = new Date().toISOString();
+  const normalizedCandidates = payload.candidateValues.map((candidate) => sanitizeFixtureValue(candidate)) as EngineeringValue[];
+  const fixture = fixtures.create({ id: randomUUID(), name: payload.name, originalFilename: payload.originalFilename, documentType: payload.documentType, componentType: payload.componentType, componentName: payload.componentName, candidateValues: normalizedCandidates, warnings: payload.warnings, createdAt: now });
+  return sendJson(req,res,201,{ fixtureId: fixture.id, ...fixture });
+}
+if(method==='GET'&&pathname==='/extraction-fixtures') return sendJson(req,res,200,fixtures.list().map((f)=>({ fixtureId:f.id, ...f })));
+if(method==='GET'&&/^\/extraction-fixtures\/[^/]+$/.test(pathname)){ const fixtureId=pathname.split('/')[2]; const fixture=fixtures.getById(fixtureId); if(!fixture) return sendJson(req,res,404,{error:'Fixture not found'}); return sendJson(req,res,200,{ fixtureId: fixture.id, ...fixture }); }
+if(method==='DELETE'&&/^\/extraction-fixtures\/[^/]+$/.test(pathname)){ const fixtureId=pathname.split('/')[2]; return sendJson(req,res,200,{ deleted: fixtures.delete(fixtureId) }); }
+
 if(pathname.startsWith('/documents/')){ const id=pathname.split('/')[2]; const existing=id?documents.getById(id):undefined; if(!existing) return sendJson(req, res,404,{error:'Document not found'}); if(method==='GET') return sendJson(req, res,200,existing); if(method==='PUT') return sendJson(req, res,200,documents.update(id,{...existing,...documentMetadataUpdateSchema.parse(await readBody(req)),updatedAt:new Date().toISOString()} as Document)); if(method==='DELETE'){ documents.delete(id); await unlink(path.join(UPLOAD_DIR,existing.storedFilename)).catch(()=>undefined); return sendJson(req, res,200,{deleted:true}); }}
 
 if(method==='GET'&&/^\/documents\/[^/]+\/extracted-text-preview$/.test(pathname)){ const id=pathname.split('/')[2]; const doc=documents.getById(id); if(!doc) return sendJson(req,res,404,{error:'Document not found'}); const filePath=path.join(UPLOAD_DIR,path.basename(doc.storedFilename)); try { await access(filePath); } catch { return sendJson(req,res,404,normalizedExtractionError('file_not_found','Document file is missing.',false)); }

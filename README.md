@@ -208,6 +208,13 @@ EXTRACTION_PROVIDER=mock npm run start --workspace @ommatidia/api
 ## Troubleshooting
 - If OpenAI reports the file looks like PDF metadata/internal structure, use extraction attempt debug details and extracted text preview to verify what text is sent.
 
+
+## Extraction fixtures
+- After a successful extraction, you can save candidate values as a reusable test fixture.
+- Fixture save/list/get/delete endpoints run locally and do not call OpenAI.
+- Fixtures are intended for replay/testing workflows later so repeated UI/review/report tests can avoid token usage.
+- Fixtures are sanitized to exclude API keys/secrets and do not store full raw document text by default.
+
 ## Troubleshooting PDF extraction
 
 - If diagnostics show a high suspicious/internal ratio, extracted text likely contains PDF internals instead of visible text.

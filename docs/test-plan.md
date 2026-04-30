@@ -54,6 +54,13 @@ This test plan defines acceptance criteria and validation strategy for existing 
 - [ ] PDF internals/metadata-heavy extraction is detected and blocked from OpenAI payloads.
 - [ ] Extraction diagnostics include extracted/useful text character counts, timeoutMs, and model-call flag.
 
+
+### Extraction fixtures (Task 17B)
+- [ ] User can save a successful extraction result as a test fixture.
+- [ ] Fixture list shows name, filename, value count, and created date.
+- [ ] Fixture save sanitizes secret-like fields and excludes full raw document text by default.
+- [ ] Fixture list/get/delete API routes work without OpenAI calls.
+
 ### Extraction provider switching
 - [ ] User can switch extraction provider between mock and OpenAI from header controls.
 - [ ] OpenAI selection is blocked when server key is missing.
