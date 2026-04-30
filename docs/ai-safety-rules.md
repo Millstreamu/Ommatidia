@@ -22,6 +22,8 @@
 - Missing evidence must produce warnings and `missingInformation` entries instead of guesses.
 - AI extraction must never mark values as `approved` and must never perform final engineering calculations.
 - User-entered/approved values remain authoritative; extraction must not overwrite approved values.
+- AI-extracted values must not be auto-approved; they must remain in `needs_review`/`ai_extracted` until a human approves them.
+- `approved` values represent human-reviewed component data and should be treated as committed engineering records.
 
 ## Extraction failure safety
 

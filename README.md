@@ -153,6 +153,13 @@ API uploads are stored in `storage/uploads/` for local development only. The fol
 - By default, the API uses a deterministic mock extraction service for tests/local development.
 - AI extracted values are candidate data only and must be reviewed/approved before final use.
 
+## Reviewing extracted values
+
+- `needs_review` and `ai_extracted` values are candidate values and require explicit human approval.
+- `approved` and `user_entered` values are treated as committed component data in review workflows.
+- `rejected` values are shown separately so users can see what was declined without mixing it into approved data.
+- Unassigned extracted values remain visible and can be assigned to a specific component before/after review.
+
 ## Extraction environment variables
 
 - `EXTRACTION_PROVIDER` (`mock` or `openai`)
