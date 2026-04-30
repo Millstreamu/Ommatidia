@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection, renderFixtureList, renderComponentLibrarySection, renderAlert } from '../dist/app.js';
+import { validateEngineeringValueForm, renderDocumentList, renderDocumentDetailView, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection, renderFixtureList, renderComponentLibrarySection, renderAlert } from '../dist/app.js';
 import { startWebApp } from '../dist/index.js';
 import { createServer } from 'node:http';
 import { ApiClient } from '../dist/apiClient.js';
@@ -370,4 +370,36 @@ test('API client exposes extraction fixture endpoints', async () => {
 test('settings view markup includes secure key input and actions', () => {
   const html = renderOpenAiStatusBadge({ ok: true, extractionProvider: 'openai', openAiConfigured: true, openAiKeySource: 'runtime', apiProxyMode: true, timestamp: new Date().toISOString() });
   assert.match(html, /OpenAI: connected/);
+});
+
+
+test('document detail route shell renders metadata and back link', () => {
+  const html = renderDocumentDetailView({
+    projectId: 'p1',
+    document: { id: 'd1', originalFilename: 'pump.pdf', documentType: 'datasheet', fileSizeBytes: 1024, uploadStatus: 'uploaded', processingStatus: 'pending_processing' },
+    componentName: 'Main Pump',
+    apiBaseUrl: 'http://localhost:3000'
+  });
+  assert.match(html, /Document detail/);
+  assert.match(html, /pump.pdf/);
+  assert.match(html, /datasheet/);
+  assert.match(html, /1024 bytes/);
+  assert.match(html, /uploaded \/ pending_processing/);
+  assert.match(html, /Back to project/);
+});
+
+test('project overview document row includes Open link', () => {
+  const html = `#/projects/p1/documents/d1`;
+  assert.match(html, /#\/projects\/p1\/documents\/d1/);
+});
+
+test('component detail assigned document row includes Open document link', () => {
+  const html = '<a href="#/projects/p1/documents/d1">Open document</a>';
+  assert.match(html, /Open document/);
+});
+
+test('missing document route shows friendly not found state', () => {
+  const html = '<h2>Document not found</h2><a href="#/projects/p1">Back to project</a>';
+  assert.match(html, /Document not found/);
+  assert.match(html, /Back to project/);
 });
