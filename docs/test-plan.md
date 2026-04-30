@@ -250,8 +250,10 @@ Package-focused (optional):
 - [x] Task 17A: candidate review controls support approve/reject/assign actions.
 - [x] Task 17A: extraction success refreshes engineering values and attempt details include created candidate keys.
 
-- [x] Task 19B: project detail screen is organized into workflow cards with quick stats and two-column responsive layout.
-- [x] Task 19B: selected component data area keeps approved/needs-review/rejected value groups and unassigned values visible with assign/approve/reject actions.
-- [x] Task 19B: document diagnostics are hidden in collapsible details by default.
-- [x] Task 19B: fixtures card supports loading/empty/error/list states and explicit replay flow cues.
-- [x] Task 19B: library card keeps search input and promote/copy actions accessible.
+## UI foundation acceptance criteria (Task 19A)
+- Root HTML shell links a shared stylesheet (`/styles.css`) and server returns CSS content-type.
+- App shell uses a cleaner layout foundation: header block, centered container, card surface styles.
+- Reusable rendering helpers exist for badges/alerts and are covered by UI tests.
+- Status badges map to status-specific class variants (`approved`, `user_entered`, `needs_review`, `ai_extracted`, `rejected`, `superseded`).
+- Alert variants (`info`, `success`, `warning`, `error`) produce predictable class names.
+- Existing extraction/provider workflows still pass existing UI tests.

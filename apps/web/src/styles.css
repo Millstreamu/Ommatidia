@@ -1,0 +1,44 @@
+:root {
+  --bg: #f3f6fb;
+  --surface: #ffffff;
+  --border: #cbd5e1;
+  --text: #0f172a;
+  --muted: #475569;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --radius: 10px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: Inter, system-ui, -apple-system, sans-serif; }
+.app-header { padding: var(--space-4); border-bottom: 1px solid var(--border); background: #f8fafc; display: flex; justify-content: space-between; gap: var(--space-4); }
+.header-subtitle { margin: 6px 0 0; color: var(--muted); }
+.breadcrumbs { margin-top: 10px; color: var(--muted); font-size: 13px; }
+.container { padding: var(--space-4); max-width: 1280px; margin: 0 auto; display: grid; gap: var(--space-4); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-4); }
+.section-header h3 { margin: 0 0 6px; }
+.section-header p { margin: 0; color: var(--muted); }
+label { font-size: 14px; color: var(--muted); }
+input, select, textarea, button { min-height: 36px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); font: inherit; }
+button { cursor: pointer; }
+.btn-primary { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
+.btn-secondary { background: #e2e8f0; color: #0f172a; }
+.btn-danger { background: #b91c1c; color: #fff; border-color: #b91c1c; }
+.btn-ghost { background: transparent; color: #334155; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; color: #fff; font-size: 12px; }
+.badge-approved { background: #166534; }
+.badge-user_entered { background: #1d4ed8; }
+.badge-needs_review { background: #b45309; font-weight: 700; }
+.badge-ai_extracted { background: #7c3aed; font-weight: 700; }
+.badge-rejected { background: #b91c1c; }
+.badge-superseded { background: #475569; }
+.badge-mock { background: #64748b; }
+.badge-fixture { background: #2563eb; }
+.badge-openai { background: #166534; }
+.alert { padding: 10px; border-radius: 8px; border: 1px solid var(--border); }
+.alert-info { background: #eff6ff; color: #1e3a8a; }
+.alert-success { background: #ecfdf5; color: #065f46; }
+.alert-warning { background: #fffbeb; color: #92400e; }
+.alert-error { background: #fef2f2; color: #991b1b; }
+.empty-state { color: var(--muted); padding: var(--space-3); border: 1px dashed var(--border); border-radius: 8px; }

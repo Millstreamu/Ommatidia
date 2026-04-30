@@ -47,3 +47,10 @@ Users can export saved report sections to a Microsoft Word `.docx` document from
 - AI extraction UX must show loading, success, normalized friendly errors, and retryability where supported.
 - Calculations stay deterministic and show formula name, units, assumptions, warnings, and result readability.
 - Report sections are clearly marked as editable drafts, with save and Word export feedback that reflects the current saved content.
+
+## UI principles
+- **Review-first**: interface must clearly separate candidate AI values from approved/user-entered final values.
+- **Component-oriented**: use reusable cards, buttons, badges, alerts, and table-like structures for consistent UI expansion.
+- **Clear status communication**: status badges and alerts should make approval state and provider mode obvious at a glance.
+- **No hidden AI decisions**: extraction mode and OpenAI readiness are always visible in the header status panel.
+- **Fixtures for repeatable testing**: fixture workflows remain visible and unchanged so deterministic replay testing is easy.

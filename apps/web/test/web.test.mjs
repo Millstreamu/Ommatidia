@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection, renderFixtureList, renderComponentLibrarySection } from '../dist/app.js';
+import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection, renderFixtureList, renderComponentLibrarySection, renderAlert } from '../dist/app.js';
 import { startWebApp } from '../dist/index.js';
 import { createServer } from 'node:http';
 import { ApiClient } from '../dist/apiClient.js';
@@ -43,8 +43,12 @@ test('project details section headings are represented', () => {
 
 test('engineering value status badges include key statuses', () => {
   assert.match(renderStatusBadge('needs_review'), /needs_review/);
+  assert.match(renderStatusBadge('needs_review'), /badge-needs_review/);
   assert.match(renderStatusBadge('ai_extracted'), /ai_extracted/);
   assert.match(renderStatusBadge('approved'), /approved/);
+});
+test('renderAlert includes alert variant class', () => {
+  assert.match(renderAlert('hello', 'warning'), /alert-warning/);
 });
 test('component review layout groups statuses and actions correctly', () => {
   const html = renderEngineeringValuesSection(
@@ -166,7 +170,23 @@ test('web root serves html with loading state and mount script', async () => {
     assert.match(html, /Loading Engineering Design Assistant/);
     assert.match(html, /mountApp/);
     assert.match(html, /resolveApiBaseUrl/);
+    assert.match(html, /<link rel="stylesheet" href="\/styles.css">/);
     assert.doesNotMatch(html, /^\s*\[/);
+  });
+});
+test('app shell exposes engineering title and status panel container', async () => {
+  await withWebServer(async (base) => {
+    const res = await fetch(base + '/');
+    const html = await res.text();
+    assert.match(html, /Engineering Design Assistant/);
+    assert.match(html, /id="app"/);
+  });
+});
+test('web serves styles.css with css content type', async () => {
+  await withWebServer(async (base) => {
+    const res = await fetch(base + '/styles.css');
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type') ?? '', /text\/css/);
   });
 });
 
