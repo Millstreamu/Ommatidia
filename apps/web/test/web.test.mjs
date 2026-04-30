@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics } from '../dist/app.js';
+import { validateEngineeringValueForm, renderDocumentList, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection } from '../dist/app.js';
 import { startWebApp } from '../dist/index.js';
 import { createServer } from 'node:http';
 import { ApiClient } from '../dist/apiClient.js';
@@ -45,6 +45,25 @@ test('engineering value status badges include key statuses', () => {
   assert.match(renderStatusBadge('needs_review'), /needs_review/);
   assert.match(renderStatusBadge('ai_extracted'), /ai_extracted/);
   assert.match(renderStatusBadge('approved'), /approved/);
+});
+test('component review layout groups statuses and actions correctly', () => {
+  const html = renderEngineeringValuesSection(
+    [{ id: 'c1', name: '3054C', type: 'Engine' }],
+    [
+      { id: 'v1', componentId: 'c1', label: 'Maximum Power', value: 97, unit: 'kW', status: 'approved' },
+      { id: 'v2', componentId: 'c1', label: 'Bore', value: 105, unit: 'mm', status: 'user_entered' },
+      { id: 'v3', componentId: 'c1', label: 'Rated Speed', value: '2200-2400', unit: 'rpm', status: 'needs_review' },
+      { id: 'v4', componentId: 'c1', label: 'Temp', value: 108, unit: '°C', status: 'rejected' },
+      { id: 'v5', label: 'Unassigned', value: 10, unit: 'bar', status: 'ai_extracted' }
+    ]
+  );
+  assert.match(html, /Approved data/);
+  assert.match(html, /Needs review/);
+  assert.match(html, /Rejected/);
+  assert.doesNotMatch(html, /<strong>Maximum Power<\/strong>[\s\S]*data-status-id="v1"/);
+  assert.match(html, /Rated Speed[\s\S]*Approve<\/button>[\s\S]*Reject<\/button>/);
+  assert.match(html, /Unassigned extracted values/);
+  assert.match(html, /data-assign-action-id="v5"/);
 });
 
 test('OpenAI status badge renders connected state', () => {

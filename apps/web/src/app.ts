@@ -103,6 +103,37 @@ export function renderProjectsView(projects: Array<{ id: string; name: string; d
   if (!projects.length) return '<p>No projects yet. Create your first project to get started.</p>';
   return `<ul style="list-style:none;padding:0;display:grid;gap:12px;">${projects.map((p) => `<li style="border:1px solid #cbd5e1;border-radius:8px;padding:12px;"><h3 style="margin:0 0 6px;">${p.name}</h3><p style="margin:0 0 6px;">${p.description ?? 'No description provided.'}</p><small>Created ${new Date(p.createdAt).toLocaleString()}</small><br/><a href="#/projects/${p.id}">Open project</a></li>`).join('')}</ul>`;
 }
+
+type UiComponent = { id: string; name: string; type: string };
+type UiEngineeringValue = { id: string; componentId?: string; label: string; value: number | string | boolean; unit?: string; status: string };
+const APPROVED_STATUSES = new Set(['approved', 'user_entered']);
+const NEEDS_REVIEW_STATUSES = new Set(['needs_review', 'ai_extracted']);
+const REJECTED_STATUSES = new Set(['rejected']);
+function renderValueRow(v: UiEngineeringValue, actions = ''): string {
+  return `<li style="padding:8px 0;border-top:1px solid #e2e8f0;"><strong>${v.label}</strong>: ${String(v.value)} ${v.unit ?? ''} ${renderStatusBadge(v.status)}<br/><small>Unit: ${v.unit ?? 'n/a'} • Source: stored in record metadata when available.</small>${actions ? `<br/>${actions}` : ''}</li>`;
+}
+export function renderEngineeringValuesSection(components: UiComponent[], values: UiEngineeringValue[]): string {
+  const componentOptions = components.map((c) => `<option value="${c.id}">${c.name} (${c.type})</option>`).join('');
+  const cards = components.map((component) => {
+    const componentValues = values.filter((v) => v.componentId === component.id);
+    const approved = componentValues.filter((v) => APPROVED_STATUSES.has(v.status));
+    const review = componentValues.filter((v) => NEEDS_REVIEW_STATUSES.has(v.status));
+    const rejected = componentValues.filter((v) => REJECTED_STATUSES.has(v.status));
+    return `<article style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;margin-bottom:12px;">
+      <h4 style="margin:0;">Component: ${component.name}</h4><p style="margin:4px 0 8px;">Type: ${component.type}</p>
+      <button data-promote-component-id="${component.id}">Promote to library</button>
+      <h5>Approved data</h5><ul style="list-style:none;padding-left:0;">${approved.length ? approved.map((v) => renderValueRow(v)).join('') : '<li>No approved data yet.</li>'}</ul>
+      <h5>Needs review</h5><ul style="list-style:none;padding-left:0;">${review.length ? review.map((v) => renderValueRow(v, `<button data-status-id="${v.id}" data-status="approved">Approve</button> <button data-status-id="${v.id}" data-status="rejected">Reject</button>`)).join('') : '<li>No values need review.</li>'}</ul>
+      <h5>Rejected</h5><ul style="list-style:none;padding-left:0;">${rejected.length ? rejected.map((v) => renderValueRow(v)).join('') : '<li>No rejected values.</li>'}</ul>
+    </article>`;
+  }).join('');
+  const unassigned = values.filter((v) => !v.componentId);
+  return `<section><h3>Engineering values</h3><p>AI-extracted values need review before they are used in final reports. Approved and user-entered values are used by default.</p>
+    ${cards}
+    <article style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;margin-bottom:12px;"><h4>Unassigned extracted values</h4><ul style="list-style:none;padding-left:0;">${unassigned.length ? unassigned.map((v) => renderValueRow(v, `<select data-assign-value-id="${v.id}"><option value="">Select component</option>${componentOptions}</select> <button data-assign-action-id="${v.id}">Assign</button>${NEEDS_REVIEW_STATUSES.has(v.status) ? ` <button data-status-id="${v.id}" data-status="approved">Approve</button> <button data-status-id="${v.id}" data-status="rejected">Reject</button>` : ''}`)).join('') : '<li>None</li>'}</ul></article>
+    <div id="engineering-values-error" style="color:#b91c1c;font-weight:600;"></div>
+    <form id="value-form"><select name="componentId">${components.map((c) => `<option value="${c.id}">${c.name}</option>`)}</select><input name="key" placeholder="Key" required/><input name="label" placeholder="Label" required/><input name="value" placeholder="Value" required/><select name="valueType"><option>number</option><option>string</option><option>boolean</option></select><input name="unit" placeholder="Unit (optional)"/><select name="status"><option value="user_entered">user_entered</option><option value="needs_review">needs_review</option><option value="approved">approved</option><option value="ai_extracted">ai_extracted</option><option value="rejected">rejected</option><option value="superseded">superseded</option></select><button>Add value</button></form></section>`;
+}
 export async function submitCreateProject(
   client: ApiClient,
   input: { name: string; description?: string; projectType: string },
@@ -196,13 +227,12 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
         client.listComponentLibrary()
       ]);
       nav.innerHTML = `<a href="#/" style="margin-right:12px;">Projects</a><strong>${project.name}</strong>`;
-      const valuesByComponent = components.map((c) => ({ component: c, values: values.filter((v) => v.componentId === c.id) }));
-      const componentOptions = components.map((c) => `<option value="${c.id}">${c.name} (${c.type})</option>`).join('');
+      const valuesSection = renderEngineeringValuesSection(components, values);
 
       view.innerHTML = `<h2>${project.name}</h2>
       <section><h3>Project overview</h3><p>${project.description ?? 'No description provided.'}</p></section>
       <section><h3>Components</h3><ul>${components.map((c) => `<li>${c.name} (${c.type}) <button data-promote-component-id="${c.id}">Promote to library</button></li>`).join('')}</ul><form id="component-form"><input name="name" placeholder="Component name" required/><input name="type" placeholder="Component type" required/><button>Add component</button></form></section>
-      <section><h3>Engineering values</h3><p>AI-extracted values need review before they are used in final reports. Approved and user-entered values are used by default.</p>${valuesByComponent.map(({ component, values: componentValues }) => `<h4>${component.name}</h4><ul>${componentValues.map((v) => `<li><strong>${v.label}</strong>: ${String(v.value)} ${v.unit ?? ''} ${renderStatusBadge(v.status)}<br/><small>Unit: ${v.unit ?? 'n/a'} • Source reference: stored in record metadata when available.</small><br/><button data-status-id="${v.id}" data-status="approved">Approve</button> <button data-status-id="${v.id}" data-status="rejected">Reject</button></li>`).join('')}</ul>`).join('')}<h4>Unassigned extracted values</h4><ul>${values.filter((v)=>!v.componentId).map((v)=>`<li><strong>${v.label}</strong>: ${String(v.value)} ${v.unit ?? ''} ${renderStatusBadge(v.status)}</li>`).join('') || '<li>None</li>'}</ul><form id="value-form"><select name="componentId">${components.map((c) => `<option value="${c.id}">${c.name}</option>`)}</select><input name="key" placeholder="Key" required/><input name="label" placeholder="Label" required/><input name="value" placeholder="Value" required/><select name="valueType"><option>number</option><option>string</option><option>boolean</option></select><input name="unit" placeholder="Unit (optional)"/><select name="status"><option value="user_entered">user_entered</option><option value="needs_review">needs_review</option><option value="approved">approved</option><option value="ai_extracted">ai_extracted</option><option value="rejected">rejected</option><option value="superseded">superseded</option></select><button>Add value</button></form></section>
+      ${valuesSection}
       <section><h3>Documents</h3><p>Supported upload file types: PDF, PNG, JPG, JPEG, WEBP.</p><form id="document-form"><input name="file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" required/><select name="documentType"><option value="datasheet">datasheet</option><option value="manual">manual</option><option value="quote">quote</option><option value="schematic">schematic</option><option value="drawing">drawing</option><option value="other">other</option></select><button>Upload document</button></form><ul>${documents.map((d)=>`<li>${d.originalFilename} | ${d.documentType} | ${d.fileSizeBytes} bytes | ${d.uploadStatus}/${d.processingStatus} | Component: <select data-document-component-id="${d.id}"><option value="">Unassigned</option>${components.map((c)=>`<option value="${c.id}" ${d.componentId===c.id?'selected':''}>${c.name}</option>`).join('')}</select> | Fixture: <select data-extract-fixture-id="${d.id}"><option value="">Select fixture</option></select> | <button data-extract-doc-id="${d.id}">Run extraction</button> <button data-save-fixture-doc-id="${d.id}">Save as test fixture</button> <button data-retry-doc-id="${d.id}">Retry</button> <span id="extract-status-${d.id}"></span><ul id="extract-attempts-${d.id}"></ul></li>`).join('')}</ul></section>
       <section><h3>AI extraction</h3><p>Review extracted values carefully. Unapproved values remain visible until accepted or rejected.</p></section>
       <section><h3>Extraction fixtures</h3><ul id="fixture-list">Loading fixtures…</ul></section>
@@ -218,7 +248,7 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
       view.querySelectorAll<HTMLButtonElement>('button[data-extract-doc-id]').forEach((btn) => { btn.onclick = async () => { const statusEl = view.querySelector(`#extract-status-${btn.dataset.extractDocId!}`) as HTMLElement; statusEl.textContent = 'Extracting...'; try { const docSelect = view.querySelector(`select[data-document-component-id="${btn.dataset.extractDocId!}"]`) as HTMLSelectElement | null; const selectedComponentId = docSelect?.value || undefined; const fixtureSelect = view.querySelector(`select[data-extract-fixture-id="${btn.dataset.extractDocId!}"]`) as HTMLSelectElement | null; const fixtureId = fixtureSelect?.value || undefined; if (latestSystemStatus?.extractionProvider === 'fixture' && !fixtureId) throw new Error('Select a fixture before replaying fixture extraction.'); const result = await client.extractValues({ projectId, documentId: btn.dataset.extractDocId!, componentId: selectedComponentId, fixtureId }); const keys = Array.isArray((result as any).createdCandidateKeys) ? (result as any).createdCandidateKeys.join(', ') : ''; statusEl.textContent = `Success: provider ${result.providerMetadata?.provider ?? 'unknown'} | created ${result.valuesCreatedCount ?? 0} value(s)${keys ? ` — ${keys}` : ''}. ${result.warnings?.[0] ?? ''}`; await load(); } catch (error) { const err = error as Error & { extractionError?: { errorCode?: string; message?: string; retryable?: boolean; userAction?: string; details?: Record<string, unknown> } }; statusEl.textContent = formatExtractionFailure(err); } }; });
       for (const d of documents) { const attempts = await client.listExtractionAttempts(projectId, d.id); const el = view.querySelector(`#extract-attempts-${d.id}`) as HTMLElement | null; if (el) el.innerHTML = attempts.map((a) => { const droppedSummary = renderDroppedCandidateWarnings(a); const diag = renderExtractionDiagnostics(a); const preview = typeof (a.diagnostics as Record<string, unknown> | undefined)?.pdfTextPreview === 'string' ? String((a.diagnostics as Record<string, unknown>).pdfTextPreview) : ''; const createdKeys = Array.isArray((a as any).createdCandidateKeys) ? (a as any).createdCandidateKeys.join(', ') : Array.isArray((a.diagnostics as any)?.createdCandidateKeys) ? (a.diagnostics as any).createdCandidateKeys.join(', ') : ''; return `<li><strong>${a.status}</strong> | provider: ${a.provider} | created: ${a.valuesCreatedCount}${createdKeys ? ` — ${createdKeys}` : ''}${a.valuesCreatedCount===0?' (zero values)':''} | ${a.errorCode ?? 'no error'}${a.warnings?.length?`<br/><span style="color:#92400e;">${a.warnings.join(' | ')}</span>`:''}${diag?`<br/><span style="color:#334155;">${diag}</span>`:''}${preview?`<details><summary>Text preview sent to OpenAI</summary><pre style="white-space:pre-wrap;max-height:180px;overflow:auto;">${preview}</pre></details>`:''}${droppedSummary?`<br/><span style="color:#92400e;">${droppedSummary}</span>`:''}${a.safeErrorMessage?`<br/><span style="color:#b91c1c;">${a.safeErrorMessage}</span>`:''}</li>`; }).join(''); }
       view.querySelectorAll<HTMLButtonElement>('button[data-retry-doc-id]').forEach((btn) => { btn.onclick = () => { view.querySelector<HTMLButtonElement>(`button[data-extract-doc-id="${btn.dataset.retryDocId!}"]`)?.click(); }; });
-      view.querySelectorAll<HTMLButtonElement>('button[data-status-id]').forEach((btn) => { btn.onclick = async () => { await client.updateEngineeringValueStatus(btn.dataset.statusId!, btn.dataset.status as 'approved' | 'rejected'); await load(); }; });
+      view.querySelectorAll<HTMLButtonElement>('button[data-status-id]').forEach((btn) => { btn.onclick = async () => { const errEl = view.querySelector('#engineering-values-error') as HTMLElement | null; btn.disabled = true; if (errEl) errEl.textContent = ''; try { await client.updateEngineeringValueStatus(btn.dataset.statusId!, btn.dataset.status as 'approved' | 'rejected'); await load(); } catch (error) { if (errEl) errEl.textContent = `Could not update status: ${(error as Error).message}`; btn.disabled = false; } }; });
       view.querySelectorAll<HTMLSelectElement>('select[data-document-component-id]').forEach((select) => {
         select.onchange = async () => {
           await client.updateDocumentMetadata(select.dataset.documentComponentId!, { componentId: select.value || undefined });
@@ -226,11 +256,19 @@ export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
       });
       view.querySelectorAll<HTMLButtonElement>('button[data-assign-action-id]').forEach((btn) => {
         btn.onclick = async () => {
+          const errEl = view.querySelector('#engineering-values-error') as HTMLElement | null;
           const valueId = btn.dataset.assignActionId!;
           const select = view.querySelector(`select[data-assign-value-id="${valueId}"]`) as HTMLSelectElement | null;
           if (!select?.value) return;
-          await client.assignEngineeringValueComponent(valueId, select.value);
-          await load();
+          btn.disabled = true;
+          if (errEl) errEl.textContent = '';
+          try {
+            await client.assignEngineeringValueComponent(valueId, select.value);
+            await load();
+          } catch (error) {
+            if (errEl) errEl.textContent = `Could not assign value: ${(error as Error).message}`;
+            btn.disabled = false;
+          }
         };
       });
       (view.querySelector('#document-form') as HTMLFormElement).onsubmit = async (e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const selectedFile = fd.get('file'); if (!(selectedFile instanceof File)) { alert('File is required'); return; } await client.uploadDocument(projectId, selectedFile, String(fd.get('documentType') || 'other')); await load(); };

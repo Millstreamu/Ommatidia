@@ -113,6 +113,11 @@ This test plan defines acceptance criteria and validation strategy for existing 
 - [ ] Project create failure resets busy state and re-enables create button.
 - [ ] Hydraulic calculation UI labels expected units and presents readable results.
 - [ ] Report section edit/save flow and Word export action/status remain clear and functional.
+- [ ] Engineering values are grouped by component cards with clear Approved data / Needs review / Rejected subsections.
+- [ ] Approved and user_entered values do not show Approve/Reject actions.
+- [ ] needs_review and ai_extracted values show Approve/Reject actions and move sections after status updates.
+- [ ] Rejected values appear only in Rejected subsection.
+- [ ] Unassigned extracted values are rendered separately and can be assigned to a component from UI.
 
 ## Manual smoke test checklist
 1. Create project, component, and engineering values in the web app.
