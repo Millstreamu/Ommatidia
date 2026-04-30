@@ -11,9 +11,10 @@ const html = `<!doctype html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Engineering Design Assistant</title>
+    <link rel="stylesheet" href="/styles.css">
   </head>
-  <body style="margin:0;background:#f8fafc;color:#0f172a;font-family:Inter,system-ui,-apple-system,sans-serif;">
-    <div id="app" style="padding:16px;">Loading Engineering Design Assistant…</div>
+  <body>
+    <div id="app" class="container">Loading Engineering Design Assistant…</div>
     <script type="module">
       import { mountApp, resolveApiBaseUrl } from '/app.js';
 
@@ -35,12 +36,14 @@ const html = `<!doctype html>
 
 const JS_ROUTE_TO_FILE: Record<string, string> = {
   '/app.js': 'dist/app.js',
-  '/apiClient.js': 'dist/apiClient.js'
+  '/apiClient.js': 'dist/apiClient.js',
+  '/styles.css': 'src/styles.css'
 };
 
 const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
   '.js': 'application/javascript; charset=utf-8',
-  '.map': 'application/json; charset=utf-8'
+  '.map': 'application/json; charset=utf-8',
+  '.css': 'text/css; charset=utf-8'
 };
 
 function copyResponseHeaders(proxyResponse: IncomingMessage, res: ServerResponse): void {
@@ -99,7 +102,7 @@ async function serveStaticAsset(urlPath: string, res: ServerResponse): Promise<b
   const filePath = directAsset ?? mapAsset;
 
   if (!filePath) {
-    if (urlPath.endsWith('.js') || urlPath.endsWith('.js.map') || urlPath.endsWith('.map')) {
+    if (urlPath.endsWith('.js') || urlPath.endsWith('.js.map') || urlPath.endsWith('.map') || urlPath.endsWith('.css')) {
       res.statusCode = 404;
       res.setHeader('content-type', 'text/plain; charset=utf-8');
       res.end('Not found');
@@ -110,7 +113,7 @@ async function serveStaticAsset(urlPath: string, res: ServerResponse): Promise<b
 
   try {
     const body = await readFile(resolve(process.cwd(), filePath), 'utf-8');
-    const extension = urlPath.endsWith('.js') ? '.js' : urlPath.endsWith('.map') ? '.map' : '';
+    const extension = urlPath.endsWith('.js') ? '.js' : urlPath.endsWith('.map') ? '.map' : urlPath.endsWith('.css') ? '.css' : '';
     res.statusCode = 200;
     res.setHeader('content-type', CONTENT_TYPE_BY_EXTENSION[extension] ?? 'application/octet-stream');
     res.end(body);

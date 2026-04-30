@@ -5,6 +5,16 @@ export function resolveApiBaseUrl(_hostname: string): string {
   return '/api';
 }
 
+
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+}
+export function renderButton(label: string, variant: 'primary'|'secondary'|'danger'|'ghost'='secondary', attrs=''): string { return `<button class="btn-${variant}" ${attrs}>${escapeHtml(label)}</button>`; }
+export function renderBadge(label: string, variant: string): string { return `<span class="badge badge-${variant}">${escapeHtml(label)}</span>`; }
+export function renderAlert(message: string, variant: 'info'|'success'|'warning'|'error'='info'): string { return `<div class="alert alert-${variant}">${escapeHtml(message)}</div>`; }
+export function renderSectionHeader(title: string, description=''): string { return `<div class="section-header"><h3>${escapeHtml(title)}</h3>${description?`<p>${escapeHtml(description)}</p>`:''}</div>`; }
+export function renderEmptyState(title: string, description=''): string { return `<div class="empty-state"><strong>${escapeHtml(title)}</strong>${description?`<div>${escapeHtml(description)}</div>`:''}</div>`; }
+
 const STATUS_COLORS: Record<string, string> = {
   user_entered: '#1d4ed8',
   approved: '#166534',
@@ -89,7 +99,7 @@ export function formatExtractionFailure(err: Error & { extractionError?: { error
 export function renderStatusBadge(status: string): string {
   const color = STATUS_COLORS[status] ?? '#334155';
   const emphasis = status === 'needs_review' || status === 'ai_extracted' ? 'font-weight:700;' : '';
-  return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:${color};color:white;font-size:12px;${emphasis}">${status}</span>`;
+  return `<span class="badge badge-${status}" style="background:${color};${emphasis}">${escapeHtml(status)}</span>`;
 }
 
 export function renderDocumentList(documents: Array<{ originalFilename: string; documentType: string; fileSizeBytes: number; uploadStatus: string; processingStatus: string; createdAt: string; id: string }>, apiBaseUrl: string): string {
@@ -114,9 +124,9 @@ function renderValueRow(v: UiEngineeringValue, actions = ''): string {
   return `<li style="padding:8px 0;border-top:1px solid #e2e8f0;"><strong>${v.label}</strong>: ${String(v.value)} ${v.unit ?? ''} ${renderStatusBadge(v.status)}<br/><small>Unit: ${v.unit ?? 'n/a'} • Source: stored in record metadata when available.</small>${actions ? `<br/>${actions}` : ''}</li>`;
 }
 export function renderFixtureList(fixtures: UiFixture[], options: { loading?: boolean; error?: string } = {}): string {
-  if (options.loading) return 'Loading fixtures...';
-  if (options.error) return `Could not load fixtures: ${options.error}`;
-  if (!fixtures.length) return 'No fixtures saved yet.';
+  if (options.loading) return renderEmptyState('Loading fixtures…', 'Please wait while fixtures are loaded.');
+  if (options.error) return renderAlert(`Could not load fixtures: ${options.error}`, 'error');
+  if (!fixtures.length) return renderEmptyState('No fixtures saved yet.', 'Save extracted values as fixtures for repeatable testing.');
   return fixtures.map((f) => `<li><strong>${f.name}</strong><br/>${f.originalFilename}<br/>${f.candidateValues.length} values<br/>Component: ${f.componentName ?? 'Unassigned'}<br/>Created: ${new Date(f.createdAt).toLocaleString()}</li>`).join('');
 }
 export function renderEngineeringValuesSection(components: UiComponent[], values: UiEngineeringValue[], promotingComponentId?: string): string {
@@ -148,7 +158,7 @@ export function renderEngineeringValuesSection(components: UiComponent[], values
   const unassigned = values.filter((v) => !v.componentId);
   return `<section><h3>Engineering values</h3><p>AI-extracted values need review before they are used in final reports. Approved and user-entered values are used by default.</p>
     ${cards}
-    <article style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;margin-bottom:12px;"><h4>Unassigned extracted values</h4><ul style="list-style:none;padding-left:0;">${unassigned.length ? unassigned.map((v) => renderValueRow(v, `<select data-assign-value-id="${v.id}"><option value="">Select component</option>${componentOptions}</select> <button data-assign-action-id="${v.id}">Assign</button>${NEEDS_REVIEW_STATUSES.has(v.status) ? ` <button data-status-id="${v.id}" data-status="approved">Approve</button> <button data-status-id="${v.id}" data-status="rejected">Reject</button>` : ''}`)).join('') : '<li>None</li>'}</ul></article>
+    <article style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;margin-bottom:12px;"><h4>Unassigned extracted values</h4><ul style="list-style:none;padding-left:0;">${unassigned.length ? unassigned.map((v) => renderValueRow(v, `<select data-assign-value-id="${v.id}"><option value="">Select component</option>${componentOptions}</select> <button data-assign-action-id="${v.id}">Assign</button>${NEEDS_REVIEW_STATUSES.has(v.status) ? ` <button data-status-id="${v.id}" data-status="approved">Approve</button> <button data-status-id="${v.id}" data-status="rejected">Reject</button>` : ''}`)).join('') : `<li>${renderEmptyState('None', 'No unassigned extracted values.')}</li>`}</ul></article>
     <div id="engineering-values-error" style="color:#b91c1c;font-weight:600;"></div>
     <form id="value-form"><select name="componentId">${components.map((c) => `<option value="${c.id}">${c.name}</option>`)}</select><input name="key" placeholder="Key" required/><input name="label" placeholder="Label" required/><input name="value" placeholder="Value" required/><select name="valueType"><option>number</option><option>string</option><option>boolean</option></select><input name="unit" placeholder="Unit (optional)"/><select name="status"><option value="user_entered">user_entered</option><option value="needs_review">needs_review</option><option value="approved">approved</option><option value="ai_extracted">ai_extracted</option><option value="rejected">rejected</option><option value="superseded">superseded</option></select><button>Add value</button></form></section>`;
 }
@@ -197,7 +207,7 @@ export async function triggerReportSectionsDocxExport(client: ApiClient, input: 
 
 export function mountApp(root: HTMLElement, apiBaseUrl: string): void {
   const client = new ApiClient(apiBaseUrl);
-  root.innerHTML = `<header style="padding:16px;border-bottom:1px solid #cbd5e1;background:#f8fafc;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;"><div><h1 style="margin:0;">Engineering Design Assistant</h1><p style="margin:6px 0 0;color:#334155;">AI-assisted engineering drafts with deterministic calculations and review-first workflows.</p><nav id="top-nav" style="margin-top:10px;"></nav></div><div id="system-status"></div></header><main id="view" style="padding:16px;max-width:1100px;margin:auto;"></main>`;
+  root.innerHTML = `<header class="app-header"><div><h1 style="margin:0;">Engineering Design Assistant</h1><p class="header-subtitle">AI-assisted engineering drafts with deterministic calculations and review-first workflows.</p><nav id="top-nav" class="breadcrumbs">Projects / Current Project</nav></div><div id="system-status" class="card"></div></header><main id="view" class="container"></main>`;
   const view = root.querySelector('#view') as HTMLElement;
   const nav = root.querySelector('#top-nav') as HTMLElement;
   const statusContainer = root.querySelector('#system-status') as HTMLElement;
