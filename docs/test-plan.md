@@ -220,3 +220,9 @@ Package-focused (optional):
 - [ ] Task 16G: mock provider must not call OpenAI fallback.
 - [ ] Task 16G: created counts reflect only persisted EngineeringValue rows.
 - [ ] Task 16G: unassigned extracted values are visible in UI.
+
+- [x] Task 17A: extraction with componentId saves EngineeringValue records under selected component.
+- [x] Task 17A: extraction without componentId keeps values visible in Unassigned extracted values.
+- [x] Task 17A: documents can be assigned/reassigned to a component from UI and API.
+- [x] Task 17A: candidate review controls support approve/reject/assign actions.
+- [x] Task 17A: extraction success refreshes engineering values and attempt details include created candidate keys.

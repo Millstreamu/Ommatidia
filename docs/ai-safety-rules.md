@@ -65,3 +65,5 @@
 - Do not infer engineering values from PDF internals (`/Page`, `/Resources`, object streams, etc.).
 - If text extraction is suspicious, use vision/file fallback when available.
 - Vision/file extracted values must remain `needs_review` or `ai_extracted` until user approval.
+
+- Component-specific extraction does not change review safety: all AI-created engineering values remain `needs_review`/`ai_extracted` until a user explicitly approves them.
