@@ -1,10 +1,13 @@
-.PHONY: setup start check test clean reset-local
+.PHONY: setup start update check test clean reset-local
 
 setup:
 	npm run setup
 
 start:
 	npm run start
+
+update:
+	npm run update
 
 check:
 	npm run check
