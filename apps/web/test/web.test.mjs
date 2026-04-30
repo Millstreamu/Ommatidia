@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEngineeringValueForm, renderDocumentList, renderDocumentDetailView, renderExtractionAttemptRow, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection, renderFixtureList, renderComponentLibrarySection, renderAlert } from '../dist/app.js';
+import { validateEngineeringValueForm, renderDocumentList, renderDocumentDetailView, renderExtractionAttemptRow, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection, renderFixtureList, renderComponentLibrarySection, renderAlert, renderDocumentValuesSection } from '../dist/app.js';
 import { startWebApp } from '../dist/index.js';
 import { createServer } from 'node:http';
 import { ApiClient } from '../dist/apiClient.js';
@@ -130,6 +130,28 @@ test('document list renders uploaded metadata', () => {
   assert.match(html, /pending_processing/);
 });
 
+
+test('document values section filters display state and actions', () => {
+  const html = renderDocumentValuesSection({
+    components: [{ id: 'c1', name: 'Pump', type: 'pump' }],
+    values: [
+      { id: 'v1', documentId: 'd1', componentId: 'c1', label: 'Pressure', value: 120, unit: 'bar', status: 'needs_review' },
+      { id: 'v2', documentId: 'd1', label: 'Flow', value: 32, unit: 'L/min', status: 'ai_extracted' },
+      { id: 'v3', documentId: 'd1', componentId: 'c1', label: 'Rated power', value: 10, unit: 'kW', status: 'approved' }
+    ]
+  });
+  assert.match(html, /Values from this document/);
+  assert.match(html, /Component: Pump/);
+  assert.match(html, /Unassigned/);
+  assert.match(html, /data-status-id="v1"[\s\S]*Approve/);
+  assert.match(html, /data-doc-assign-action-id="v2"/);
+  assert.doesNotMatch(html, /data-status-id="v3"/);
+});
+
+test('document values section empty state renders', () => {
+  const html = renderDocumentValuesSection({ components: [], values: [] });
+  assert.match(html, /No values have been created from this document yet\./);
+});
 test('approve/reject actions still callable via client contract', async () => {
   const calls = [];
   const client = { updateEngineeringValueStatus: async (id, status) => calls.push({ id, status }) };

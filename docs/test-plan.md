@@ -287,3 +287,11 @@ Package-focused (optional):
 - Text preview appears only inside collapsed diagnostics details.
 - Project overview documents list remains compact and shows only latest attempt summary (no long diagnostics/text preview).
 - Project overview document rows include an Open document link for drill-down details.
+
+## Document values review on document detail (Task 21B-3)
+- [x] Document detail page shows only engineering values created from the selected document (`documentId` filter).
+- [x] Values are grouped into assigned component sections and an unassigned section.
+- [x] `needs_review` and `ai_extracted` rows show Approve/Reject actions.
+- [x] `approved` and `user_entered` rows do not show Approve/Reject actions.
+- [x] Unassigned values show assign-to-component controls.
+- [x] Empty state renders: "No values have been created from this document yet."
