@@ -331,3 +331,17 @@ Package-focused (optional):
 - `ops/run-review` output must include current branch, commit-created status, ahead-of-origin status, and exact push command.
 - `ops/run-review` must warn when running on a non-`main` branch.
 
+
+
+## BeeBot operator command catalog and shortcuts
+
+### Acceptance criteria
+- Operators can discover supervised commands via `ops/help` and `ops/COMMANDS.md`.
+- Shortcuts exist for `session_once`, `session_batch`, `review_latest`, `readiness_check`, and `status_all`.
+- Catalog clearly states current-branch artifact review for `ops/latest-session-review.md` and `ops/latest-session-raw.txt`.
+- Wrapper scripts are executable and do not modify strategy thresholds, risk caps, or mainnet/safety behavior.
+
+### Coverage map
+- `apps/api/test/operatorShortcuts.test.mjs` validates helper output and wrapper forwarding behavior.
+- `apps/api/test/runReviewCurrentBranch.test.mjs` covers current-branch review-commit behavior.
+- `apps/api/test/sessionBatch.test.mjs` covers supervised batch artifact generation and rollups.

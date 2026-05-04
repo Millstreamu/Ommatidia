@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REVIEW_MD="${BEEBOT_REVIEW_MD_PATH:-$SCRIPT_DIR/latest-session-review.md}"
+REVIEW_RAW="${BEEBOT_REVIEW_RAW_PATH:-$SCRIPT_DIR/latest-session-raw.txt}"
+
+echo "[review_latest] branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+echo "[review_latest] current-branch artifacts"
+echo "- $REVIEW_MD"
+echo "- $REVIEW_RAW"
+[[ -f "$REVIEW_MD" ]] || { echo "missing: $REVIEW_MD"; exit 1; }
+[[ -f "$REVIEW_RAW" ]] || { echo "missing: $REVIEW_RAW"; exit 1; }
+echo "\n--- latest-session-review.md (first 80 lines) ---"
+sed -n '1,80p' "$REVIEW_MD"

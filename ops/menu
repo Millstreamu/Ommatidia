@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo "BeeBot operator menu"
+echo "1) help"
+echo "2) status_all"
+echo "3) readiness_check"
+echo "4) session_once"
+echo "5) review_latest"
+echo "6) session_batch"
+read -r -p "Choose an action [1-6]: " choice
+case "$choice" in
+  1) "$SCRIPT_DIR/help" ;;
+  2) "$SCRIPT_DIR/status-all" ;;
+  3) "$SCRIPT_DIR/readiness-check" ;;
+  4) "$SCRIPT_DIR/session-once" ;;
+  5) "$SCRIPT_DIR/review-latest" ;;
+  6) read -r -p "Session count: " n; read -r -p "Wait seconds (default 300): " w; "$SCRIPT_DIR/session-batch" "$n" "${w:-300}" ;;
+  *) echo "Invalid option"; exit 1 ;;
+esac

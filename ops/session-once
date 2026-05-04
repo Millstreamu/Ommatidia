@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+START_CMD="${BEEBOT_SESSION_START_CMD:-true}"
+STOP_CMD="${BEEBOT_SESSION_STOP_CMD:-true}"
+REVIEW_CMD="${BEEBOT_REVIEW_CMD:-$SCRIPT_DIR/run-review}"
+
+echo "[session_once] start command: $START_CMD"
+bash -lc "$START_CMD"
+echo "[session_once] stop command: $STOP_CMD"
+bash -lc "$STOP_CMD"
+echo "[session_once] review command: $REVIEW_CMD"
+"$REVIEW_CMD"
+echo "[session_once] done"

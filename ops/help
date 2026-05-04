@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+cat <<'TXT'
+BeeBot operator shortcuts
+
+Stable actions (future UI button IDs):
+- session_once
+- session_batch
+- review_latest
+- readiness_check
+- status_all
+
+Shortcuts:
+- ops/help                Show this help
+- ops/status-all          Status snapshot
+- ops/readiness-check     Safe readiness preflight
+- ops/session-once        One supervised session + latest review refresh
+- ops/session-batch N [W] N sessions with wait seconds W (default 300)
+- ops/review-latest       Show current-branch latest review artifact preview
+- ops/menu                Optional interactive menu
+
+Start here:
+1) ops/readiness-check
+2) ops/session-once
+3) ops/review-latest
+
+Reference catalog:
+- ops/COMMANDS.md
+TXT
+
+echo "\nCurrent branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+echo "Catalog path: $SCRIPT_DIR/COMMANDS.md"
