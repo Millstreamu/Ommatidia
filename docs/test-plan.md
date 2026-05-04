@@ -316,3 +316,10 @@ Package-focused (optional):
 - [x] Fixture selector is shown in fixture provider mode.
 - [x] Save-as-test-fixture action is shown on document detail and only enabled when latest attempt created values.
 - [x] Project overview document rows are compact (filename/type/component/latest status/Open document) and do not render full extraction controls.
+
+## BeeBot supervised-session batch review workflow (Task 22A)
+- [x] Batch runner generates timestamped run folder under `ops/batch-runs/`.
+- [x] Each batch session stores `session-<n>-review.md` and `session-<n>-raw.txt` artifacts.
+- [x] Batch summary stores total sessions and rollup counts for `stood_aside`, `acted_no_fill`, `acted_opened`, `acted_round_trip`, `blocked`, `refused`.
+- [x] Batch summary reports `latest_acted_session` and `latest_round_trip_session` markers.
+- [x] Empty/no-acted batches keep acted markers as `none` and provide a supervisory next-step message.
