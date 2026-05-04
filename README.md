@@ -272,3 +272,33 @@ EXTRACTION_PROVIDER=mock npm run start --workspace @ommatidia/api
 - This file is gitignored. Never commit or share it.
 - Existing `.env` / Codespaces `OPENAI_API_KEY` still works; runtime key takes priority.
 - If `.env` was accidentally tracked, untrack it with: `git rm --cached .env`.
+
+## BeeBot supervised-session batch review workflow
+
+Run a bounded supervised batch from repo root:
+
+```bash
+./ops/run-session-batch.sh <N> [wait-seconds]
+```
+
+Convenience wrapper:
+
+```bash
+./ops/run-batch <N> [wait-seconds]
+```
+
+### Generated artifacts
+
+Each batch run is written under:
+
+- `ops/batch-runs/<timestamp>/batch-summary.md`
+- `ops/batch-runs/<timestamp>/session-<n>-review.md`
+- `ops/batch-runs/<timestamp>/session-<n>-raw.txt`
+
+The summary includes total sessions, status rollups (`stood_aside`, `acted_no_fill`, `acted_opened`, `acted_round_trip`, `blocked`, `refused`), latest acted/round-trip session markers, and one operator next step.
+
+### Codex/operator review order
+
+1. Review the latest `ops/batch-runs/<timestamp>/batch-summary.md` first.
+2. Then open the latest acted session review artifact from that same batch run.
+3. Use older traces only when needed for context/regressions.
