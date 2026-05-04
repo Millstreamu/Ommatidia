@@ -323,3 +323,11 @@ Package-focused (optional):
 - [x] Batch summary stores total sessions and rollup counts for `stood_aside`, `acted_no_fill`, `acted_opened`, `acted_round_trip`, `blocked`, `refused`.
 - [x] Batch summary reports `latest_acted_session` and `latest_round_trip_session` markers.
 - [x] Empty/no-acted batches keep acted markers as `none` and provide a supervisory next-step message.
+
+
+### BeeBot current-branch review artifact workflow
+- `ops/run-review` must not create or switch branches.
+- `ops/run-review` must only commit `ops/latest-session-review.md` and `ops/latest-session-raw.txt` when changed.
+- `ops/run-review` output must include current branch, commit-created status, ahead-of-origin status, and exact push command.
+- `ops/run-review` must warn when running on a non-`main` branch.
+
