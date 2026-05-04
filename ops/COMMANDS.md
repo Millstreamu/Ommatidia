@@ -93,14 +93,3 @@ If batch artifacts exist:
 2. Drill into that run's latest acted session review (`session-<n>-review.md`) when present.
 3. Use `ops/review-latest` for current-branch latest artifact quick view.
 
-## Safety / status commands
-
-### Action: `status_all`
-- **Purpose:** Snapshot only; no trading logic changes.
-- **Exact command:** `ops/status-all`
-- **Cautions:** Does not execute sessions.
-
-### Action: `help`
-- **Purpose:** List stable operator actions and quick-start recipes.
-- **Exact command:** `ops/help`
-- **Cautions:** Documentation-only helper.
