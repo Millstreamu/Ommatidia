@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEngineeringValueForm, renderDocumentList, renderDocumentDetailView, renderExtractionAttemptRow, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection, renderFixtureList, renderComponentLibrarySection, renderAlert, renderDocumentValuesSection, renderFixturesPageShell, renderFixtureSummaryCard, renderComponentLibraryPageShell, renderComponentLibrarySummaryCard } from '../dist/app.js';
+import { validateEngineeringValueForm, renderDocumentList, renderDocumentDetailView, renderExtractionAttemptRow, triggerReportSectionsDocxExport, renderProjectsView, renderStatusBadge, renderOpenAiStatusBadge, renderExtractionProviderControls, formatExtractionFailure, resolveApiBaseUrl, submitCreateProject, renderDroppedCandidateWarnings, renderExtractionDiagnostics, renderEngineeringValuesSection, renderFixtureList, renderComponentLibrarySection, renderAlert, renderDocumentValuesSection, renderFixturesPageShell, renderFixtureSummaryCard, renderComponentLibraryPageShell, renderComponentLibrarySummaryCard, formatOperatorOutcome } from '../dist/app.js';
 import { startWebApp } from '../dist/index.js';
 import { createServer } from 'node:http';
 import { ApiClient } from '../dist/apiClient.js';
@@ -518,4 +518,23 @@ test('extraction attempt row keeps diagnostics collapsed with text preview insid
   });
   assert.match(html, /<details><summary>Show diagnostics<\/summary>/);
   assert.match(html, /Text preview:/);
+});
+
+
+test('operator outcome wording is standardized for supervised session statuses', () => {
+  assert.equal(formatOperatorOutcome('stood_aside'), 'Stood aside (no trade taken)');
+  assert.equal(formatOperatorOutcome('acted_no_fill'), 'Acted, no fill');
+  assert.equal(formatOperatorOutcome('acted_opened'), 'Acted, opened position');
+  assert.equal(formatOperatorOutcome('acted_round_trip'), 'Acted, round trip complete');
+});
+
+test('extraction attempt row uses standardized operator outcome wording', () => {
+  const html = renderExtractionAttemptRow({ status: 'acted_no_fill', provider: 'fixture', valuesCreatedCount: 0 });
+  assert.match(html, /Acted, no fill/);
+});
+
+test('operator snapshot keeps dashboard read-only with no trade controls', () => {
+  const snapshot = 'Operator snapshot Supervisory dashboard (read-only) No order placement controls are enabled in this UI.';
+  assert.match(snapshot, /read-only/);
+  assert.doesNotMatch(snapshot, /Place order|Buy|Sell|Execute trade/i);
 });
