@@ -316,6 +316,12 @@ When user-facing behavior changes, update relevant docs:
 Do not churn docs for tiny internal-only edits.
 
 
+
+## Operator handoff helper (guidance only)
+
+- Operators can use ready-to-copy Codex review prompts in `ops/CODEX_REVIEW_PROMPTS.md`.
+- This file is operator guidance only and must not be treated as runtime logic or product behavior.
+
 ## BeeBot supervised batch review workflow
 
 When `ops/batch-runs/<timestamp>/batch-summary.md` exists, Codex/operator review should:
