@@ -255,6 +255,27 @@ EXTRACTION_PROVIDER=mock npm run start --workspace @ommatidia/api
 - Replay requires selecting a target component and target document, clearly states that OpenAI is not called, and creates `needs_review` values.
 - Fixture replay is test data playback only and does not consume OpenAI credits/tokens.
 
+
+## BeeBot supervised review artifacts (current branch workflow)
+
+Use this flow when you want Codex to review the latest supervised BeeBot session artifacts on the branch you are actively using.
+
+Preferred flow on `main`:
+
+```bash
+git checkout main
+git pull --ff-only
+./ops/run-review
+git push origin main
+```
+
+What `./ops/run-review` does:
+- does **not** create or switch branches
+- updates/commits `ops/latest-session-review.md` and `ops/latest-session-raw.txt` on the current branch only when they changed
+- prints the current branch, whether a commit was created, ahead/behind context for `origin/<branch>`, and the exact push command
+
+Using a non-`main` branch is allowed. In that case, Codex and other operators will only see the latest artifacts from that branch until it is pushed/merged as needed.
+
 ## Troubleshooting PDF extraction
 
 - If diagnostics show a high suspicious/internal ratio, extracted text likely contains PDF internals instead of visible text.

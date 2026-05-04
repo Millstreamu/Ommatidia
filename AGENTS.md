@@ -328,3 +328,12 @@ When `ops/batch-runs/<timestamp>/batch-summary.md` exists, Codex/operator review
 1. Start with the most recent `batch-summary.md`.
 2. Drill into that run's `session-<n>-review.md` for the latest acted session (`acted_no_fill`, `acted_opened`, `acted_round_trip`) when present.
 3. Ignore older inactive/noise traces unless they are needed to explain a regression or repeated blocked/refused behavior.
+
+
+## BeeBot supervised review artifact preference
+
+When `ops/latest-session-review.md` and `ops/latest-session-raw.txt` are present, prefer those files from the **current branch** as the primary review inputs.
+
+- Do not assume or request a dedicated review branch.
+- Treat current-branch artifacts as the source of truth for the most recent supervised review context.
+
