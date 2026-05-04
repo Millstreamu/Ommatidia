@@ -328,12 +328,13 @@ Using a non-`main` branch is allowed. In that case, Codex and other operators wi
 Run a bounded supervised batch from repo root:
 
 ```bash
-./ops/run-session-batch.sh <N> [wait-seconds]
+ops/session-batch <N> [wait-seconds]
 ```
 
-Convenience wrapper:
+Compatibility aliases (legacy wrappers, same behavior):
 
 ```bash
+./ops/run-session-batch.sh <N> [wait-seconds]
 ./ops/run-batch <N> [wait-seconds]
 ```
 
