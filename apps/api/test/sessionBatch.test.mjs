@@ -28,7 +28,7 @@ status_list=( ${statuses.join(' ')} )
 status="${statuses[0]}"
 if [[ "$index" -lt "${statuses.length}" ]]; then status="${statuses.join(' ')}"; status=$(echo "$status" | cut -d ' ' -f $((index + 1))); fi
 printf "%s" $((index + 1)) > "$STATE_FILE"
-printf "# review\nstatus: %s\n" "$status" > "$LATEST_REVIEW"
+printf "# review\nstatus: %s\n\n## Top next step\nKeep current risk guardrails.\n" "$status" > "$LATEST_REVIEW"
 printf "raw %s\n" "$status" > "$LATEST_RAW"
 `;
   const reviewCmd = path.join(root, 'mock-run-review.sh');
@@ -63,10 +63,32 @@ test('batch artifact generation creates per-session review/raw and summary', asy
   assert.ok(existsSync(path.join(runDir, 'batch-summary.md')));
 });
 
-test('summary rollups include counts and latest markers', async () => {
+test('session review artifact includes parseable metadata and verdict block', async () => {
+  const harness = await setupHarness(['acted_no_fill']);
+  const runDir = await runBatch(harness, 1);
+  const review = await fs.readFile(path.join(runDir, 'session-1-review.md'), 'utf8');
+  assert.match(review, /artifact_type: single_session_review/);
+  assert.match(review, /reviewed_session_id: 1/);
+  assert.match(review, /session_start_utc: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
+  assert.match(review, /session_stop_utc: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
+  assert.match(review, /git_branch: /);
+  assert.match(review, /git_commit: [a-f0-9]{40}|unknown/);
+  assert.match(review, /artifact_generated_utc: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
+  assert.match(review, /entry_executed: yes/);
+  assert.match(review, /exit_executed: yes/);
+  assert.match(review, /ended_flat: yes/);
+  assert.match(review, /behavior_classification: acted_no_fill/);
+  assert.match(review, /top_next_step: Keep current risk guardrails\./);
+});
+
+test('summary rollups include counts, latest markers, and metadata block', async () => {
   const harness = await setupHarness(['stood_aside', 'acted_no_fill', 'acted_round_trip', 'refused']);
   const runDir = await runBatch(harness, 4);
   const summary = await fs.readFile(path.join(runDir, 'batch-summary.md'), 'utf8');
+  assert.match(summary, /artifact_type: batch_summary/);
+  assert.match(summary, /reviewed_session_id: batch_/);
+  assert.match(summary, /git_branch: /);
+  assert.match(summary, /git_commit: [a-f0-9]{40}|unknown/);
   assert.match(summary, /total_sessions_run: 4/);
   assert.match(summary, /stood_aside: 1/);
   assert.match(summary, /acted_no_fill: 1/);
