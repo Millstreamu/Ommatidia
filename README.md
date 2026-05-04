@@ -256,6 +256,33 @@ EXTRACTION_PROVIDER=mock npm run start --workspace @ommatidia/api
 - Fixture replay is test data playback only and does not consume OpenAI credits/tokens.
 
 
+## BeeBot operator command catalog and shortcuts
+
+Start with:
+
+```bash
+ops/help
+```
+
+Primary reference:
+
+- `ops/COMMANDS.md` (operator command catalog)
+
+Stable action names (for future UI button mapping):
+
+- `session_once`
+- `session_batch`
+- `review_latest`
+- `readiness_check`
+- `status_all`
+
+Current-branch review artifacts:
+
+- `ops/latest-session-review.md`
+- `ops/latest-session-raw.txt`
+
+These artifacts are reviewed from the **current branch** first.
+
 ## BeeBot supervised review artifacts (current branch workflow)
 
 Use this flow when you want Codex to review the latest supervised BeeBot session artifacts on the branch you are actively using.

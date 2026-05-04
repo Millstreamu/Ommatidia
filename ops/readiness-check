@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REVIEW_CMD="${BEEBOT_REVIEW_CMD:-$SCRIPT_DIR/run-review}"
+
+echo "[readiness_check] validating operator workflow prerequisites"
+for cmd in git bash; do
+  command -v "$cmd" >/dev/null
+  echo "- found command: $cmd"
+done
+if [[ -x "$REVIEW_CMD" ]]; then
+  echo "- review command executable: $REVIEW_CMD"
+else
+  echo "- review command missing/not executable: $REVIEW_CMD"
+  exit 1
+fi
+echo "- current branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+echo "- latest artifact path (md): ${BEEBOT_REVIEW_MD_PATH:-$SCRIPT_DIR/latest-session-review.md}"
+echo "- latest artifact path (raw): ${BEEBOT_REVIEW_RAW_PATH:-$SCRIPT_DIR/latest-session-raw.txt}"
+echo "[readiness_check] complete (no session commands executed)"

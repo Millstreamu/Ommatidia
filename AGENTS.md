@@ -317,6 +317,21 @@ Do not churn docs for tiny internal-only edits.
 
 
 
+
+## BeeBot operator command catalog and stable actions
+
+- Operator command reference lives at `ops/COMMANDS.md`.
+- Operators should start with `ops/help` for discoverability and shortcut commands.
+- Stable operator action IDs for future UI button mapping are:
+  - `session_once`
+  - `session_batch`
+  - `review_latest`
+  - `readiness_check`
+  - `status_all`
+- Current-branch artifact review remains authoritative via:
+  - `ops/latest-session-review.md`
+  - `ops/latest-session-raw.txt`
+
 ## Operator handoff helper (guidance only)
 
 - Operators can use ready-to-copy Codex review prompts in `ops/CODEX_REVIEW_PROMPTS.md`.
