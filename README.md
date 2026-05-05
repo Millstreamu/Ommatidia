@@ -124,6 +124,7 @@ npm run test
 See the full acceptance checklist and coverage map in [`docs/test-plan.md`](docs/test-plan.md).
 
 Operator handoff helper: ready-to-copy BeeBot/Codex review prompts are available in [`ops/CODEX_REVIEW_PROMPTS.md`](ops/CODEX_REVIEW_PROMPTS.md).
+Operator terminology quick-reference is available in [`ops/GLOSSARY.md`](ops/GLOSSARY.md).
 
 Core validation commands (run from repository root):
 
