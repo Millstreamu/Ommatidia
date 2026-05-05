@@ -39,6 +39,7 @@ fi
 current_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
 current_commit="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 RUN_TS="$(date -u +%Y%m%dT%H%M%SZ)"
+BATCH_START_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 RUN_DIR="$BATCH_ROOT/$RUN_TS"
 mkdir -p "$RUN_DIR"
 
@@ -80,7 +81,7 @@ for ((i=1; i<=SESSION_COUNT; i++)); do
     stood_aside|acted_no_fill|blocked|refused|acted_round_trip) ended_flat="yes" ;;
   esac
 
-  top_next_step_line="$(awk '/^## Top next step/{getline; gsub(/^\s+|\s+$/, "", $0); print; exit}' "$SOURCE_REVIEW_MD" || true)"
+  top_next_step_line="$(awk '/^## Top next step/{getline; gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0); print; exit}' "$SOURCE_REVIEW_MD" || true)"
   if [[ -z "$top_next_step_line" ]]; then
     top_next_step_line="Review this session artifact before changing thresholds or safety rules."
   fi
@@ -89,13 +90,13 @@ for ((i=1; i<=SESSION_COUNT; i++)); do
     echo "# BeeBot session review artifact"
     echo
     echo "## Artifact metadata"
-    echo "- artifact_type: single_session_review"
-    echo "- reviewed_session_id: $i"
+    echo "- artifact_type: single-session"
+    echo "- session_id: $session_label"
     echo "- session_start_utc: $session_start_utc"
     echo "- session_stop_utc: $session_stop_utc"
+    echo "- artifact_generated_at_utc: $artifact_generated_utc"
     echo "- git_branch: $current_branch"
     echo "- git_commit: $current_commit"
-    echo "- artifact_generated_utc: $artifact_generated_utc"
     echo
     echo "## Current session verdict"
     echo "- entry_executed: yes"
@@ -130,30 +131,34 @@ else
 fi
 
 artifact_generated_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+batch_stop_utc="$artifact_generated_utc"
 cat > "$RUN_DIR/batch-summary.md" <<EOF
 # BeeBot supervised batch summary
 
-## Batch metadata
-- batch_timestamp_utc: $RUN_TS
+## Artifact metadata
+- artifact_type: batch
+- batch_id: $RUN_TS
+- session_start_utc: $BATCH_START_UTC
+- session_stop_utc: $batch_stop_utc
+- artifact_generated_at_utc: $artifact_generated_utc
 - git_branch: $current_branch
 - git_commit: $current_commit
-- artifact_generated_utc: $artifact_generated_utc
-- total_sessions_run: $SESSION_COUNT
 - session_duration_seconds: $SESSION_DURATION_SECONDS
 - pause_seconds_between_sessions: $PAUSE_SECONDS
 
-## Batch rollup
-- stood_aside: $count_stood_aside
-- acted_no_fill: $count_acted_no_fill
-- acted_opened: $count_acted_opened
-- acted_round_trip: $count_acted_round_trip
-- blocked: $count_blocked
-- refused: $count_refused
-
-## Session markers
+## Batch summary
+- total_sessions: $SESSION_COUNT
+- counts_by_behavior:
+  - stood_aside: $count_stood_aside
+  - acted_no_fill: $count_acted_no_fill
+  - acted_opened: $count_acted_opened
+  - acted_round_trip: $count_acted_round_trip
+  - blocked: $count_blocked
+  - refused: $count_refused
 - latest_acted_session: $latest_acted_session
 - latest_round_trip_session: $latest_round_trip_session
 - latest_no_fill_session: $latest_no_fill_session
+- top_next_step: $next_step
 
 ## Operator next step
 $next_step

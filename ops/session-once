@@ -5,10 +5,18 @@ START_CMD="${BEEBOT_SESSION_START_CMD:-true}"
 STOP_CMD="${BEEBOT_SESSION_STOP_CMD:-true}"
 REVIEW_CMD="${BEEBOT_REVIEW_CMD:-$SCRIPT_DIR/run-review}"
 
+session_start_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "[session_once] start command: $START_CMD"
 bash -lc "$START_CMD"
 echo "[session_once] stop command: $STOP_CMD"
 bash -lc "$STOP_CMD"
+exit_executed="yes"
+session_stop_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "[session_once] review command: $REVIEW_CMD"
+BEEBOT_SESSION_ID="${BEEBOT_SESSION_ID:-latest}" \
+BEEBOT_SESSION_START_UTC="$session_start_utc" \
+BEEBOT_SESSION_STOP_UTC="$session_stop_utc" \
+BEEBOT_ENTRY_EXECUTED="yes" \
+BEEBOT_EXIT_EXECUTED="$exit_executed" \
 "$REVIEW_CMD"
 echo "[session_once] done"

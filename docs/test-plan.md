@@ -320,9 +320,11 @@ Package-focused (optional):
 ## BeeBot supervised-session batch review workflow (Task 22A)
 - [x] Batch runner generates timestamped run folder under `ops/batch-runs/`.
 - [x] Each batch session stores `session-<n>-review.md` and `session-<n>-raw.txt` artifacts.
-- [x] Batch summary stores total sessions and rollup counts for `stood_aside`, `acted_no_fill`, `acted_opened`, `acted_round_trip`, `blocked`, `refused`.
+- [x] Batch summary includes top-level artifact metadata, total sessions, rollup counts for `stood_aside`, `acted_no_fill`, `acted_opened`, `acted_round_trip`, `blocked`, `refused`, and top next step.
 - [x] Batch summary reports `latest_acted_session` and `latest_round_trip_session` markers.
 - [x] Empty/no-acted batches keep acted markers as `none` and provide a supervisory next-step message.
+- [x] Per-session review artifacts include metadata and verdict blocks with session id, UTC start/stop/generated timestamps, branch, commit, entry/exit execution, ended-flat status, behavior classification, and top next step.
+- [x] `ops/run-review` decorates legacy `ops/latest-session-review.md` artifacts with metadata and verdict blocks without changing BeeBot runtime/trading behavior.
 
 
 ### BeeBot current-branch review artifact workflow

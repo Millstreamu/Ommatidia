@@ -299,10 +299,16 @@ git push origin main
 
 What `./ops/run-review` does:
 - does **not** create or switch branches
+- ensures `ops/latest-session-review.md` has top-of-file artifact metadata and a current session verdict block before commit
 - updates/commits `ops/latest-session-review.md` and `ops/latest-session-raw.txt` on the current branch only when they changed
 - prints the current branch, whether a commit was created, ahead/behind context for `origin/<branch>`, and the exact push command
 
 Using a non-`main` branch is allowed. In that case, Codex and other operators will only see the latest artifacts from that branch until it is pushed/merged as needed.
+
+Codex/operator review order for single-session artifacts:
+1. Read `## Artifact metadata` first to confirm artifact type, session id, UTC start/stop/generation times, git branch, and git commit.
+2. Read `## Current session verdict` next for entry/exit execution, ended-flat status, behavior classification, and top next step.
+3. Only then drill into the original review body and raw artifact if details are needed.
 
 ## Troubleshooting PDF extraction
 
@@ -338,11 +344,11 @@ Arguments:
 - `30`: optional pause between sessions in seconds
 
 Generated artifacts per run in `ops/batch-runs/<timestamp>/`:
-- `batch-summary.md` (batch rollup and operator next step)
-- `session-01-review.md` + `session-01-raw.txt` (per session, zero-padded sequence)
+- `batch-summary.md` (batch metadata, top-level summary, rollup, and operator next step)
+- `session-01-review.md` + `session-01-raw.txt` (per session, zero-padded sequence with metadata and verdict blocks)
 
 How this differs from single-session review:
 - `ops/session-once` runs one cycle and refreshes current-branch latest artifacts.
 - `ops/session-batch` runs N bounded cycles, snapshots each session, and produces one compact rollup summary for operator/Codex triage.
 
-Codex should review latest batch by opening `batch-summary.md` first, then the latest acted session artifact in that same run directory when needed.
+Codex should review latest batch by opening `batch-summary.md` first. Start with `## Artifact metadata` and `## Batch summary` to confirm the batch id, UTC window, branch/commit, total session count, behavior counts, latest acted/round-trip sessions, and top next step; then open the latest acted session artifact in that same run directory when needed.

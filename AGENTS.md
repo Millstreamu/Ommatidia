@@ -341,7 +341,7 @@ Do not churn docs for tiny internal-only edits.
 ## BeeBot supervised batch review workflow
 
 When `ops/batch-runs/<timestamp>/batch-summary.md` exists, Codex/operator review should:
-1. Start with the most recent `batch-summary.md`.
+1. Start with the most recent `batch-summary.md` and read `## Artifact metadata` plus `## Batch summary` before any older detail sections.
 2. Drill into that run's `session-<n>-review.md` for the latest acted session (`acted_no_fill`, `acted_opened`, `acted_round_trip`) when present.
 3. Prioritize the latest acted session artifact (`acted_no_fill`, `acted_opened`, `acted_round_trip`) for drill-down.
 4. Ignore older inactive/noise traces unless they are needed to explain a regression or repeated blocked/refused behavior.
@@ -351,6 +351,8 @@ When `ops/batch-runs/<timestamp>/batch-summary.md` exists, Codex/operator review
 
 When `ops/latest-session-review.md` and `ops/latest-session-raw.txt` are present, prefer those files from the **current branch** as the primary review inputs.
 
+- Read `## Artifact metadata` first to verify artifact type, session id, UTC timestamps, branch, and commit.
+- Read `## Current session verdict` second to get entry/exit execution, ended-flat status, behavior classification, and top next step at a glance.
 - Do not assume or request a dedicated review branch.
 - Treat current-branch artifacts as the source of truth for the most recent supervised review context.
 
