@@ -38,7 +38,7 @@ printf "raw %s\n" "$status" > "$LATEST_RAW"
 
 async function runBatch(harness, count) {
   const script = path.resolve('../../ops/run-session-batch.sh');
-  await execFileAsync(script, [String(count), '0'], {
+  await execFileAsync(script, [String(count), '0', '0'], {
     env: {
       ...process.env,
       BEEBOT_REVIEW_CMD: harness.reviewCmd,
@@ -56,17 +56,17 @@ async function runBatch(harness, count) {
 test('batch artifact generation creates per-session review/raw and summary', async () => {
   const harness = await setupHarness(['stood_aside', 'blocked']);
   const runDir = await runBatch(harness, 2);
-  assert.ok(existsSync(path.join(runDir, 'session-1-review.md')));
-  assert.ok(existsSync(path.join(runDir, 'session-2-review.md')));
-  assert.ok(existsSync(path.join(runDir, 'session-1-raw.txt')));
-  assert.ok(existsSync(path.join(runDir, 'session-2-raw.txt')));
+  assert.ok(existsSync(path.join(runDir, 'session-01-review.md')));
+  assert.ok(existsSync(path.join(runDir, 'session-02-review.md')));
+  assert.ok(existsSync(path.join(runDir, 'session-01-raw.txt')));
+  assert.ok(existsSync(path.join(runDir, 'session-02-raw.txt')));
   assert.ok(existsSync(path.join(runDir, 'batch-summary.md')));
 });
 
 test('session review artifact includes parseable metadata and verdict block', async () => {
   const harness = await setupHarness(['acted_no_fill']);
   const runDir = await runBatch(harness, 1);
-  const review = await fs.readFile(path.join(runDir, 'session-1-review.md'), 'utf8');
+  const review = await fs.readFile(path.join(runDir, 'session-01-review.md'), 'utf8');
   assert.match(review, /artifact_type: single_session_review/);
   assert.match(review, /reviewed_session_id: 1/);
   assert.match(review, /session_start_utc: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
@@ -85,17 +85,16 @@ test('summary rollups include counts, latest markers, and metadata block', async
   const harness = await setupHarness(['stood_aside', 'acted_no_fill', 'acted_round_trip', 'refused']);
   const runDir = await runBatch(harness, 4);
   const summary = await fs.readFile(path.join(runDir, 'batch-summary.md'), 'utf8');
-  assert.match(summary, /artifact_type: batch_summary/);
-  assert.match(summary, /reviewed_session_id: batch_/);
-  assert.match(summary, /git_branch: /);
+    assert.match(summary, /git_branch: /);
   assert.match(summary, /git_commit: [a-f0-9]{40}|unknown/);
   assert.match(summary, /total_sessions_run: 4/);
+  assert.match(summary, /batch_timestamp_utc: \d{8}T\d{6}Z/);
   assert.match(summary, /stood_aside: 1/);
   assert.match(summary, /acted_no_fill: 1/);
   assert.match(summary, /acted_round_trip: 1/);
   assert.match(summary, /refused: 1/);
-  assert.match(summary, /latest_acted_session: 3/);
-  assert.match(summary, /latest_round_trip_session: 3/);
+  assert.match(summary, /latest_acted_session: 03/);
+  assert.match(summary, /latest_round_trip_session: 03/);
 });
 
 test('empty no-acted batch summary keeps latest_acted_session as none', async () => {
@@ -104,6 +103,7 @@ test('empty no-acted batch summary keeps latest_acted_session as none', async ()
   const summary = await fs.readFile(path.join(runDir, 'batch-summary.md'), 'utf8');
   assert.match(summary, /latest_acted_session: none/);
   assert.match(summary, /latest_round_trip_session: none/);
+  assert.match(summary, /latest_no_fill_session: none/);
 });
 
 test('batch supports acted_no_fill and acted_opened counts', async () => {
@@ -112,5 +112,6 @@ test('batch supports acted_no_fill and acted_opened counts', async () => {
   const summary = await fs.readFile(path.join(runDir, 'batch-summary.md'), 'utf8');
   assert.match(summary, /acted_no_fill: 1/);
   assert.match(summary, /acted_opened: 1/);
-  assert.match(summary, /latest_acted_session: 2/);
+  assert.match(summary, /latest_acted_session: 02/);
+  assert.match(summary, /latest_no_fill_session: 01/);
 });

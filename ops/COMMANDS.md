@@ -32,7 +32,7 @@ Codex and operators should review these files from the current branch first, the
 
 ### Action: `session_batch`
 - **Purpose:** Run multiple supervised sessions and generate per-session artifacts + batch summary.
-- **Exact command:** `ops/session-batch <session-count> [wait-seconds]`
+- **Exact command:** `ops/session-batch <session-count> <session-duration-seconds> [pause-seconds]`
 - **When to use:** Multi-session evidence gathering without changing strategy/safety.
 - **Common output to expect:** `[batch] session x/y` lines and final run artifact directory.
 - **Cautions:** Session count must be a positive integer.
@@ -81,7 +81,7 @@ Recommended bounded flow:
 For repeated supervised attempts:
 
 1. `ops/readiness-check`
-2. `ops/session-batch <n> [wait-seconds]`
+2. `ops/session-batch <n> <duration-seconds> [pause-seconds]`
 3. `ops/review-latest`
 4. Inspect newest `ops/batch-runs/<timestamp>/batch-summary.md`
 
@@ -93,3 +93,15 @@ If batch artifacts exist:
 2. Drill into that run's latest acted session review (`session-<n>-review.md`) when present.
 3. Use `ops/review-latest` for current-branch latest artifact quick view.
 
+
+
+## Batch artifacts generated
+
+Each batch run writes to `ops/batch-runs/<timestamp>/`:
+- `batch-summary.md`
+- `session-01-review.md`, `session-01-raw.txt` (and sequentially for each session)
+
+Codex review order for supervised batches:
+1. Open latest `ops/batch-runs/<timestamp>/batch-summary.md`.
+2. If acted sessions exist, drill into the latest acted session artifact from the same folder.
+3. Ignore older inactive/noise traces unless needed to explain current-batch regressions.
