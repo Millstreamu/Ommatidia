@@ -342,7 +342,8 @@ Do not churn docs for tiny internal-only edits.
 When `ops/batch-runs/<timestamp>/batch-summary.md` exists, Codex/operator review should:
 1. Start with the most recent `batch-summary.md`.
 2. Drill into that run's `session-<n>-review.md` for the latest acted session (`acted_no_fill`, `acted_opened`, `acted_round_trip`) when present.
-3. Ignore older inactive/noise traces unless they are needed to explain a regression or repeated blocked/refused behavior.
+3. Prioritize the latest acted session artifact (`acted_no_fill`, `acted_opened`, `acted_round_trip`) for drill-down.
+4. Ignore older inactive/noise traces unless they are needed to explain a regression or repeated blocked/refused behavior.
 
 
 ## BeeBot supervised review artifact preference

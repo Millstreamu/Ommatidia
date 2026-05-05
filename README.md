@@ -323,33 +323,25 @@ Using a non-`main` branch is allowed. In that case, Codex and other operators wi
 - Existing `.env` / Codespaces `OPENAI_API_KEY` still works; runtime key takes priority.
 - If `.env` was accidentally tracked, untrack it with: `git rm --cached .env`.
 
-## BeeBot supervised-session batch review workflow
+## BeeBot supervised batch review workflow
 
-Run a bounded supervised batch from repo root:
-
-```bash
-ops/session-batch <N> [wait-seconds]
-```
-
-Compatibility aliases (legacy wrappers, same behavior):
+Run repeated bounded supervised sessions (no strategy/threshold changes):
 
 ```bash
-./ops/run-session-batch.sh <N> [wait-seconds]
-./ops/run-batch <N> [wait-seconds]
+ops/session-batch 5 300 30
 ```
 
-### Generated artifacts
+Arguments:
+- `5`: number of sessions
+- `300`: per-session duration in seconds
+- `30`: optional pause between sessions in seconds
 
-Each batch run is written under:
+Generated artifacts per run in `ops/batch-runs/<timestamp>/`:
+- `batch-summary.md` (batch rollup and operator next step)
+- `session-01-review.md` + `session-01-raw.txt` (per session, zero-padded sequence)
 
-- `ops/batch-runs/<timestamp>/batch-summary.md`
-- `ops/batch-runs/<timestamp>/session-<n>-review.md`
-- `ops/batch-runs/<timestamp>/session-<n>-raw.txt`
+How this differs from single-session review:
+- `ops/session-once` runs one cycle and refreshes current-branch latest artifacts.
+- `ops/session-batch` runs N bounded cycles, snapshots each session, and produces one compact rollup summary for operator/Codex triage.
 
-The summary includes total sessions, status rollups (`stood_aside`, `acted_no_fill`, `acted_opened`, `acted_round_trip`, `blocked`, `refused`), latest acted/round-trip session markers, and one operator next step.
-
-### Codex/operator review order
-
-1. Review the latest `ops/batch-runs/<timestamp>/batch-summary.md` first.
-2. Then open the latest acted session review artifact from that same batch run.
-3. Use older traces only when needed for context/regressions.
+Codex should review latest batch by opening `batch-summary.md` first, then the latest acted session artifact in that same run directory when needed.
