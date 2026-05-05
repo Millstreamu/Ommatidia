@@ -336,6 +336,7 @@ Do not churn docs for tiny internal-only edits.
 
 - Operators can use ready-to-copy Codex review prompts in `ops/CODEX_REVIEW_PROMPTS.md`.
 - This file is operator guidance only and must not be treated as runtime logic or product behavior.
+- Operators can use term definitions in `ops/GLOSSARY.md` to interpret session/review outcomes consistently.
 
 ## BeeBot supervised batch review workflow
 
