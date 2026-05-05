@@ -67,13 +67,13 @@ test('session review artifact includes parseable metadata and verdict block', as
   const harness = await setupHarness(['acted_no_fill']);
   const runDir = await runBatch(harness, 1);
   const review = await fs.readFile(path.join(runDir, 'session-01-review.md'), 'utf8');
-  assert.match(review, /artifact_type: single_session_review/);
-  assert.match(review, /reviewed_session_id: 1/);
+  assert.match(review, /artifact_type: single-session/);
+  assert.match(review, /session_id: 01/);
   assert.match(review, /session_start_utc: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
   assert.match(review, /session_stop_utc: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
   assert.match(review, /git_branch: /);
   assert.match(review, /git_commit: [a-f0-9]{40}|unknown/);
-  assert.match(review, /artifact_generated_utc: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
+  assert.match(review, /artifact_generated_at_utc: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
   assert.match(review, /entry_executed: yes/);
   assert.match(review, /exit_executed: yes/);
   assert.match(review, /ended_flat: yes/);
@@ -85,16 +85,22 @@ test('summary rollups include counts, latest markers, and metadata block', async
   const harness = await setupHarness(['stood_aside', 'acted_no_fill', 'acted_round_trip', 'refused']);
   const runDir = await runBatch(harness, 4);
   const summary = await fs.readFile(path.join(runDir, 'batch-summary.md'), 'utf8');
-    assert.match(summary, /git_branch: /);
+  assert.match(summary, /artifact_type: batch/);
+  assert.match(summary, /batch_id: \d{8}T\d{6}Z/);
+  assert.match(summary, /session_start_utc: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
+  assert.match(summary, /session_stop_utc: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
+  assert.match(summary, /artifact_generated_at_utc: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
+  assert.match(summary, /git_branch: /);
   assert.match(summary, /git_commit: [a-f0-9]{40}|unknown/);
-  assert.match(summary, /total_sessions_run: 4/);
-  assert.match(summary, /batch_timestamp_utc: \d{8}T\d{6}Z/);
+  assert.match(summary, /total_sessions: 4/);
+  assert.match(summary, /counts_by_behavior:/);
   assert.match(summary, /stood_aside: 1/);
   assert.match(summary, /acted_no_fill: 1/);
   assert.match(summary, /acted_round_trip: 1/);
   assert.match(summary, /refused: 1/);
   assert.match(summary, /latest_acted_session: 03/);
   assert.match(summary, /latest_round_trip_session: 03/);
+  assert.match(summary, /top_next_step: Review session-03-review\.md first/);
 });
 
 test('empty no-acted batch summary keeps latest_acted_session as none', async () => {
